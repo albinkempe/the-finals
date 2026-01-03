@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Finals | Rank Tracker</title>
+    <link rel="icon" type="image/png" href="favicon.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
@@ -24,7 +25,7 @@
             padding: 20px;
         }
 
-        .container {
+        main {
             width: 95%;
             max-width: 1600px;
             padding: 20px;
@@ -47,18 +48,26 @@
             text-align: center;
         }
 
+        .chart-wrapper {
+            position: relative;
+            height: 70vh;
+            width: 100%;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 10px;
                 width: 100%;
             }
-            h1 { font-size: 1.2rem; }
-        }
 
-        .chart-wrapper {
-            position: relative;
-            height: 70vh;
-            width: 100%;
+            h1 {
+                font-size: 1.2rem;
+            }
+
+            .the_finals_logo {
+                margin-top: 1rem;
+                margin-bottom: 0rem;
+            }
         }
     </style>
 </head>
@@ -66,11 +75,11 @@
 
     <img src="the_finals_logo.png" alt="The Finals logo" width="100" class="the_finals_logo">
     
-    <div class="container">
+    <main>
         <div class="chart-wrapper">
             <canvas id="rankChart"></canvas>
         </div>
-    </div>
+    </main>
 
     <script>
         const csvUrl = 'rank_data.csv';
@@ -146,7 +155,7 @@
                                 usePointStyle: true,
                                 color: '#ffffff',
                                 font: { weight: 'bold', size: 14 },
-                                padding: 40,
+                                padding: 15,
                                 boxWidth: 6,
                                 boxHeight: 6
                             }
