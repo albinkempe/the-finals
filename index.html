@@ -87,8 +87,6 @@
     <script>
         const csvUrl = 'rank_data.csv';
 
-        const chartColors = ['#ff0df7', '#ff7a0d', '#0dff25'];
-
         async function fetchData() {
             try {
                 const response = await fetch(csvUrl);
@@ -108,20 +106,32 @@
         }
 
         function processData(data) {
-            const cleanData = data.filter(row => row.RecordedAt && row.steamName);
-            const players = [...new Set(cleanData.map(item => item.steamName))];
-            const labels = [...new Set(cleanData.map(item => item.RecordedAt.split(' ')[0]))].sort();
+            if (!data || !Array.isArray(data)) return;
 
-            const datasets = players.map((player, index) => {
-                const color = chartColors[index % chartColors.length];
+            const cleanData = data
+                .filter(row => row.RecordedAt && row.steamName)
+                .sort((a, b) => new Date(a.RecordedAt) - new Date(b.RecordedAt));
+
+            const labels = [...new Set(cleanData.map(item => item.RecordedAt.split(' ')[0]))];
+
+            const groupedByPlayer = cleanData.reduce((acc, item) => {
+                const playerName = item.steamName;
+                if (!acc[playerName]) acc[playerName] = [];
+
+                acc[playerName].push({
+                    x: item.RecordedAt.split(' ')[0],
+                    y: item.rankScore
+                });
+                return acc;
+            }, {});
+
+            const colors = typeof chartColors !== 'undefined' ? chartColors : ['#ff0df7', '#ff7a0d', '#0dff25'];
+
+            const datasets = Object.keys(groupedByPlayer).map((player, index) => {
+                const color = colors[index % colors.length];
                 return {
                     label: player,
-                    data: cleanData
-                        .filter(item => item.steamName === player)
-                        .map(item => ({
-                            x: item.RecordedAt.split(' ')[0],
-                            y: item.rankScore
-                        })),
+                    data: groupedByPlayer[player],
                     borderColor: color,
                     backgroundColor: color + '33',
                     pointBackgroundColor: color,
