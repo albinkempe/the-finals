@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="icon" type="image/png" href="favicon.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
     <style>
         :root {
             --bg-color: #080224;
@@ -71,10 +73,11 @@
         }
     </style>
 </head>
+
 <body>
 
     <img src="the_finals_logo.png" alt="The Finals logo" width="100" class="the_finals_logo">
-    
+
     <main>
         <div class="chart-wrapper">
             <canvas id="rankChart"></canvas>
@@ -95,7 +98,7 @@
                     header: true,
                     dynamicTyping: true,
                     skipEmptyLines: true,
-                    complete: function(results) {
+                    complete: function (results) {
                         processData(results.data);
                     }
                 });
@@ -116,19 +119,20 @@
                     data: cleanData
                         .filter(item => item.steamName === player)
                         .map(item => ({
-                            x: item.RecordedAt.split(' ')[0], 
+                            x: item.RecordedAt.split(' ')[0],
                             y: item.rankScore
                         })),
                     borderColor: color,
                     backgroundColor: color + '33',
-                    pointBackgroundColor: color, 
+                    pointBackgroundColor: color,
                     pointBorderColor: color,
                     borderWidth: 2,
                     pointRadius: 3,
                     pointHoverRadius: 5,
+                    pointHitRadius: 8,
                     tension: 0,
                     fill: false,
-                    pointStyle: 'circle' 
+                    pointStyle: 'circle'
                 };
             });
 
@@ -137,7 +141,7 @@
 
         function renderChart(labels, datasets) {
             const ctx = document.getElementById('rankChart').getContext('2d');
-            
+
             Chart.defaults.color = '#a0a0a0';
             Chart.defaults.borderColor = '#1a4875';
             Chart.defaults.font.family = "'Segoe UI', 'Roboto', sans-serif";
@@ -149,6 +153,17 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
+                        annotation: {
+                            annotations: {
+                                diamondZone: {
+                                    type: 'box',
+                                    yMin: 40000,
+                                    yMax: 42500,
+                                    backgroundColor: 'rgba(0, 251, 255, 0.1)',
+                                    borderColor: 'transparent'
+                                }
+                            }
+                        },
                         legend: {
                             position: 'top',
                             labels: {
@@ -178,9 +193,13 @@
                             ticks: { maxRotation: 45, minRotation: 45 }
                         },
                         y: {
+                            max: 42500,
                             beginAtZero: false,
                             grid: { color: '#1a4875' },
-                            title: { display: false}
+                            title: { display: false },
+                            ticks: {
+                                stepSize: 2500
+                            }
                         }
                     }
                 }
@@ -190,4 +209,5 @@
         fetchData();
     </script>
 </body>
+
 </html>
