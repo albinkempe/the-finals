@@ -120,7 +120,9 @@
 
                 acc[playerName].push({
                     x: item.RecordedAt.split(' ')[0],
-                    y: item.rankScore
+                    y: item.rankScore,
+                    rank: item.rank,
+                    league: item.league
                 });
                 return acc;
             }, {});
@@ -194,7 +196,23 @@
                             borderWidth: 2,
                             boxWidth: 6,
                             boxHeight: 6,
-                            usePointStyle: true
+                            usePointStyle: true,
+                            displayColors: false,
+                            callbacks: {
+                                label: function (context) {
+                                    const player = context.dataset.label;
+                                    const score = context.parsed.y.toLocaleString();
+                                    const { rank, league } = context.raw;
+                                    const formattedRank = rank ? rank.toLocaleString() : 'N/A';
+
+                                    return [
+                                        `Player: ${player}`,
+                                        `Score: ${score}`,
+                                        `Rank: ${formattedRank}`,
+                                        `League: ${league}`
+                                    ];
+                                },
+                            }
                         }
                     },
                     scales: {
