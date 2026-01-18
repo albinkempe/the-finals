@@ -108,18 +108,23 @@
         function processData(data) {
             if (!data || !Array.isArray(data)) return;
 
+            const formatDate = (dateStr) => {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            };
+
             const cleanData = data
                 .filter(row => row.RecordedAt && row.steamName)
                 .sort((a, b) => new Date(a.RecordedAt) - new Date(b.RecordedAt));
 
-            const labels = [...new Set(cleanData.map(item => item.RecordedAt.split(' ')[0]))];
+            const labels = [...new Set(cleanData.map(item => formatDate(item.RecordedAt.split(' ')[0])))];
 
             const groupedByPlayer = cleanData.reduce((acc, item) => {
                 const playerName = item.steamName;
                 if (!acc[playerName]) acc[playerName] = [];
 
                 acc[playerName].push({
-                    x: item.RecordedAt.split(' ')[0],
+                    x: formatDate(item.RecordedAt.split(' ')[0]),
                     y: item.rankScore,
                     rank: item.rank,
                     league: item.league
@@ -170,7 +175,7 @@
                                 diamondZone: {
                                     type: 'box',
                                     yMin: 40000,
-                                    yMax: 45000,
+                                    yMax: 50000,
                                     backgroundColor: 'rgba(0, 251, 255, 0.1)',
                                     borderColor: 'transparent'
                                 }
@@ -218,16 +223,33 @@
                     scales: {
                         x: {
                             grid: { display: false },
-                            ticks: { maxRotation: 45, minRotation: 45 }
+                            offset: true,
+                            ticks: {
+                                autoSkip: false,
+                                maxRotation: 45,
+                                minRotation: 0,
+                                callback: function (val, index) {
+                                    const labels = this.getLabels();
+                                    const total = labels.length;
+
+                                    if (index === total - 1) {
+                                        return labels[index];
+                                    }
+
+                                    if (index % 4 === 0 && (total - 1 - index) > 1) {
+                                        return labels[index];
+                                    }
+
+                                    return null;
+                                }
+                            }
                         },
                         y: {
-                            max: 45000,
-                            beginAtZero: false,
+                            suggestedMin: 30000,
+                            suggestedMax: 45000,
                             grid: { color: '#1a4875' },
                             title: { display: false },
-                            ticks: {
-                                stepSize: 2500
-                            }
+                            ticks: { stepSize: 2500}
                         }
                     }
                 }
