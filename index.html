@@ -56,6 +56,15 @@
             width: 100%;
         }
 
+        footer {
+            margin-top: 80px;
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--text-dim);
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 10px;
@@ -83,6 +92,10 @@
             <canvas id="rankChart"></canvas>
         </div>
     </main>
+
+    <footer>
+        <a href="https://albinkempe.github.io/hsd/">HSD Esports</a>
+    </footer>
 
     <script>
         const csvUrl = 'rank_data.csv';
