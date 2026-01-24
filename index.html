@@ -22,48 +22,63 @@
             color: var(--text-main);
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
+            padding: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 20px;
         }
 
         main {
-            width: 95%;
-            max-width: 1600px;
+            width: 90%;
             padding: 20px;
             border-radius: 12px;
-            margin-top: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
+        }
+
+        .the_finals_logo {
+            margin-top: 2rem;
+            margin-bottom: 0rem;
         }
 
         .controls {
             margin-top: 20px;
             display: flex;
-            gap: 10px;
+            gap: 0px;
         }
 
-        button {
-            background: #1a4875;
+        .controls button {
+            background: #45007e;
             border: none;
             color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
+            padding: 12px 12px;
             cursor: pointer;
             font-weight: bold;
             transition: all 0.2s;
         }
 
-        button.active {
-            background: var(--accent);
-            border-color: white;
+        #btnScore {
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
+        }
+
+        #btnRank {
+            border-top-right-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+
+        .controls button.active {
+            background: #8c00ff;
+        }
+
+        .controls button:hover:not(.active) {
+            background: #6100b1;
         }
 
         .chart-wrapper {
             position: relative;
-            height: 70vh;
+            height: 80vh;
             width: 100%;
         }
 
@@ -77,6 +92,11 @@
         }
 
         @media (max-width: 600px) {
+            .main {
+                width: 100%;
+                padding: 10px;
+            }
+
             .container {
                 padding: 10px;
                 width: 100%;
@@ -84,11 +104,6 @@
 
             h1 {
                 font-size: 1.2rem;
-            }
-
-            .the_finals_logo {
-                margin-top: 1rem;
-                margin-bottom: 0rem;
             }
 
             .chart-wrapper {
@@ -122,7 +137,7 @@
         let chartInstance = null;
         let globalLabels = [];
         let globalDatasets = [];
-        let currentView = 'score'; // 'score' or 'rank'
+        let currentView = 'score';
 
         async function fetchData() {
             try {
@@ -199,26 +214,22 @@
         function updateView(view) {
             currentView = view;
 
-            // UI Toggle
             document.getElementById('btnScore').classList.toggle('active', view === 'score');
             document.getElementById('btnRank').classList.toggle('active', view === 'rank');
 
-            // Update Y-Axis settings
             chartInstance.options.scales.y.reverse = (view === 'rank');
             chartInstance.options.scales.y.title.text = view === 'score' ? 'Rank Score' : 'Leaderboard Rank';
 
-            // Suggest specific bounds for Rank view so the Top 500 line is visible
             if (view === 'rank') {
-                chartInstance.options.scales.y.suggestedMin = 1;
+                chartInstance.options.scales.y.min = 1;
                 chartInstance.options.scales.y.suggestedMax = 1000;
                 chartInstance.options.scales.y.ticks.stepSize = 250;
             } else {
-                chartInstance.options.scales.y.suggestedMin = 30000;
+                chartInstance.options.scales.y.min = 30000;
                 chartInstance.options.scales.y.suggestedMax = 50000;
                 chartInstance.options.scales.y.ticks.stepSize = 2500;
             }
 
-            // Swap annotations based on view
             chartInstance.options.plugins.annotation.annotations = getAnnotations(view);
 
             chartInstance.data.datasets.forEach(dataset => {
@@ -230,7 +241,6 @@
 
         function getAnnotations(view) {
             if (view === 'rank') {
-                // Annotations for Top 500 Rank
                 return {
                     top500Zone: {
                         type: 'box',
@@ -249,7 +259,6 @@
                     }
                 };
             } else {
-                // Original Score Annotations
                 return {
                     diamondZone: {
                         type: 'box',
@@ -319,13 +328,16 @@
                         }
                     },
                     scales: {
-                        x: { grid: { display: false } },
-                        offset: true,
+                        x: { grid: { display: false }, offset: true },
+                        
                         y: {
-                            reverse: false, // Will be flipped for Rank view
+                            reverse: false,
                             title: { display: true, text: 'Rank Score', color: '#fff' },
                             grid: { color: '#1a4875' },
-                            ticks: { stepSize: 2500 }
+                            ticks: { stepSize: 2500 },
+                            afterFit: (axis) => {
+                                axis.width = 80;
+                            },
                         }
                     }
                 }
