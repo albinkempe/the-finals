@@ -95,6 +95,8 @@
 
     <footer>
         <a href="https://albinkempe.github.io/hsd/">HSD Esports</a>
+        <span class="sep">·</span>
+        <a href="ruby.html">Ruby View</a>
     </footer>
 
     <script>
@@ -188,9 +190,17 @@
                                 diamondZone: {
                                     type: 'box',
                                     yMin: 40000,
-                                    yMax: 50000,
+                                    yMax: 47500,
                                     backgroundColor: 'rgba(0, 251, 255, 0.1)',
                                     borderColor: 'transparent'
+                                },
+                                diamondLine: {
+                                    type: 'line',
+                                    yMin: 40000,
+                                    yMax: 40000,
+                                    borderColor: 'rgba(0, 251, 255, 0.6)',
+                                    borderWidth: 3,
+                                    drawTime: 'beforeDatasetsDraw'
                                 }
                             }
                         },
@@ -244,7 +254,7 @@
                         },
                         y: {
                             suggestedMin: 30000,
-                            suggestedMax: 50000,
+                            suggestedMax: 47500,
                             grid: { color: '#1a4875' },
                             title: { display: false },
                             ticks: { stepSize: 2500}

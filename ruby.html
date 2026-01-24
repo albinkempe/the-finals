@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Finals | Ruby Tracker</title>
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
+
+  <style>
+    :root {
+      --bg-color: #080224;
+      --text-main: #ffffff;
+      --text-dim: #a0a0a0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    main {
+      width: 95%;
+      max-width: 1600px;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 20px;
+    }
+
+    .the_finals_logo {
+      display: block;
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      letter-spacing: 1px;
+      color: #ffffff;
+      margin: 0.25rem 0 1.25rem;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .ruby {
+      color: #ff0000;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 70vh;
+      width: 100%;
+    }
+
+    footer {
+      margin-top: 80px;
+      font-size: 0.9rem;
+    }
+
+    footer a {
+      color: var(--text-dim);
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 10px;
+        width: 100%;
+      }
+
+      h1 {
+        font-size: 1.2rem;
+      }
+
+      .the_finals_logo {
+        margin-top: 1rem;
+        margin-bottom: 0rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <img src="the_finals_logo.png" alt="The Finals logo" width="100" class="the_finals_logo" />
+  <h1><span class="ruby">Ruby</span> Tracker</h1>
+
+  <main>
+    <div class="chart-wrapper">
+      <canvas id="rankChart"></canvas>
+    </div>
+  </main>
+
+  <footer>
+    <a href="https://albinkempe.github.io/hsd/">HSD Esports</a>
+    <span class="sep">·</span>
+    <a href="index.html">Rank View</a>
+  </footer>
+
+  <script>
+    const csvUrl = 'rank_data.csv';
+
+    async function fetchData() {
+      try {
+        const response = await fetch(csvUrl);
+        const csvText = await response.text();
+
+        Papa.parse(csvText, {
+          header: true,
+          dynamicTyping: true,
+          skipEmptyLines: true,
+          complete: function (results) {
+            processData(results.data);
+          }
+        });
+      } catch (error) {
+        console.error("Error loading CSV:", error);
+      }
+    }
+
+    function processData(data) {
+      if (!data || !Array.isArray(data)) return;
+
+      const formatDate = (dateStr) => {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      };
+
+      const cleanData = data
+        .filter(row => row.RecordedAt && row.steamName)
+        .sort((a, b) => new Date(a.RecordedAt) - new Date(b.RecordedAt));
+
+      const labels = [...new Set(cleanData.map(item => formatDate(item.RecordedAt.split(' ')[0])))];
+
+      const groupedByPlayer = cleanData.reduce((acc, item) => {
+        const playerName = item.steamName;
+        if (!acc[playerName]) acc[playerName] = [];
+
+        acc[playerName].push({
+          x: formatDate(item.RecordedAt.split(' ')[0]),
+          y: item.rank,              // RANK VIEW: plot rank on Y
+          rank: item.rank,
+          score: item.rankScore,     // keep score for tooltip
+          league: item.league
+        });
+        return acc;
+      }, {});
+
+      const colors = typeof chartColors !== 'undefined' ? chartColors : ['#ff0df7', '#ff7a0d', '#0dff25'];
+
+      const datasets = Object.keys(groupedByPlayer).map((player, index) => {
+        const color = colors[index % colors.length];
+        return {
+          label: player,
+          data: groupedByPlayer[player],
+          borderColor: color,
+          backgroundColor: color + '33',
+          pointBackgroundColor: color,
+          pointBorderColor: color,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          pointHitRadius: 8,
+          tension: 0,
+          fill: false,
+          pointStyle: 'circle'
+        };
+      });
+
+      renderChart(labels, datasets);
+    }
+
+    function renderChart(labels, datasets) {
+      const ctx = document.getElementById('rankChart').getContext('2d');
+
+      Chart.defaults.color = '#a0a0a0';
+      Chart.defaults.borderColor = '#1a4875';
+      Chart.defaults.font.family = "'Segoe UI', 'Roboto', sans-serif";
+
+      new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            annotation: {
+              annotations: {
+                top500Zone: {
+                  type: 'box',
+                  yMin: 1,
+                  yMax: 500,
+                  backgroundColor: 'rgba(255, 0, 0, 0.12)',
+                  borderColor: 'transparent',
+                  drawTime: 'beforeDatasetsDraw'
+                },
+                rank500Line: {
+                  type: 'line',
+                  yMin: 500,
+                  yMax: 500,
+                  borderColor: 'rgba(255, 0, 0, 0.8)',
+                  borderWidth: 3,
+                  drawTime: 'beforeDatasetsDraw'
+                }
+              }
+            },
+            legend: {
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                color: '#ffffff',
+                font: { weight: 'bold', size: 14 },
+                padding: 15,
+                boxWidth: 6,
+                boxHeight: 6
+              }
+            },
+            tooltip: {
+              backgroundColor: '#080224',
+              titleColor: '#fff',
+              bodyColor: '#fff',
+              padding: 10,
+              borderColor: '#383264',
+              borderWidth: 2,
+              boxWidth: 6,
+              boxHeight: 6,
+              usePointStyle: true,
+              displayColors: false,
+              callbacks: {
+                label: function (context) {
+                  const player = context.dataset.label;
+                  const { rank, score, league } = context.raw;
+                  const formattedRank = rank ? rank.toLocaleString() : 'N/A';
+                  const formattedScore = score ? score.toLocaleString() : 'N/A';
+
+                  return [
+                    `Player: ${player}`,
+                    `Rank: ${formattedRank}`,
+                    `Score: ${formattedScore}`,
+                    `League: ${league}`
+                  ];
+                },
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              offset: true,
+              ticks: {
+                maxRotation: 45,
+                minRotation: 0
+              }
+            },
+            y: {
+              reverse: true,           // Rank: smaller is better, so flip axis
+              beginAtZero: false,
+              min: 1,
+              grid: { color: '#1a4875' },
+              title: { display: false },
+              ticks: {
+                stepSize: 100
+              }
+            }
+          }
+        }
+      });
+    }
+
+    fetchData();
+  </script>
+</body>
+
+</html>
