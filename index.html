@@ -90,6 +90,12 @@
                 margin-top: 1rem;
                 margin-bottom: 0rem;
             }
+
+            .chart-wrapper {
+            position: relative;
+            height: 60vh;
+            width: 100%;
+        }
         }
     </style>
 </head>
@@ -101,7 +107,7 @@
         <div class="chart-wrapper">
             <canvas id="rankChart"></canvas>
         </div>
-                <div class="controls">
+        <div class="controls">
             <button id="btnScore" class="active" onclick="updateView('score')">Score View</button>
             <button id="btnRank" onclick="updateView('rank')">Rank View</button>
         </div>
@@ -279,9 +285,9 @@
                         annotation: { annotations: getAnnotations() },
                         legend: {
                             position: 'top',
-                            labels: { 
-                                color: '#ffffff', 
-                                font: { weight: 'bold' }, 
+                            labels: {
+                                color: '#ffffff',
+                                font: { weight: 'bold' },
                                 usePointStyle: true,
                                 padding: 15,
                                 boxWidth: 6,
@@ -319,7 +325,7 @@
                             reverse: false, // Will be flipped for Rank view
                             title: { display: true, text: 'Rank Score', color: '#fff' },
                             grid: { color: '#1a4875' },
-                            ticks: { stepSize: 2500}
+                            ticks: { stepSize: 2500 }
                         }
                     }
                 }
