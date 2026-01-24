@@ -75,6 +75,22 @@
         footer a {
             color: var(--text-dim);
         }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+                width: 100%;
+            }
+
+            h1 {
+                font-size: 1.2rem;
+            }
+
+            .the_finals_logo {
+                margin-top: 1rem;
+                margin-bottom: 0rem;
+            }
+        }
     </style>
 </head>
 
@@ -160,6 +176,10 @@
                     pointBorderColor: color,
                     borderWidth: 2,
                     pointRadius: 3,
+                    pointHoverRadius: 5,
+                    pointHitRadius: 8,
+                    fill: false,
+                    pointStyle: 'circle',
                     tension: 0,
                     parsing: {
                         yAxisKey: 'score' // Default parsing key
@@ -259,12 +279,26 @@
                         annotation: { annotations: getAnnotations() },
                         legend: {
                             position: 'top',
-                            labels: { color: '#ffffff', font: { weight: 'bold' }, usePointStyle: true }
+                            labels: { 
+                                color: '#ffffff', 
+                                font: { weight: 'bold' }, 
+                                usePointStyle: true,
+                                padding: 15,
+                                boxWidth: 6,
+                                boxHeight: 6
+                            }
                         },
                         tooltip: {
                             backgroundColor: '#080224',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            padding: 10,
                             borderColor: '#383264',
                             borderWidth: 2,
+                            boxWidth: 6,
+                            boxHeight: 6,
+                            usePointStyle: true,
+                            displayColors: false,
                             callbacks: {
                                 label: function (context) {
                                     const raw = context.raw;
@@ -280,6 +314,7 @@
                     },
                     scales: {
                         x: { grid: { display: false } },
+                        offset: true,
                         y: {
                             reverse: false, // Will be flipped for Rank view
                             title: { display: true, text: 'Rank Score', color: '#fff' },
