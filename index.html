@@ -14,6 +14,7 @@
             --bg-color: #080224;
             --text-main: #ffffff;
             --text-dim: #a0a0a0;
+            --accent: #ff0df7;
         }
 
         body {
@@ -33,21 +34,31 @@
             padding: 20px;
             border-radius: 12px;
             margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
-        .the_finals_logo {
-            display: block;
-            margin-top: 2rem;
-            margin-bottom: 1rem;
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
         }
 
-        h1 {
-            font-size: 1.5rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: #ffffff;
-            margin-bottom: 20px;
-            text-align: center;
+        button {
+            background: #1a4875;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        button.active {
+            background: var(--accent);
+            border-color: white;
         }
 
         .chart-wrapper {
@@ -64,43 +75,32 @@
         footer a {
             color: var(--text-dim);
         }
-
-        @media (max-width: 600px) {
-            .container {
-                padding: 10px;
-                width: 100%;
-            }
-
-            h1 {
-                font-size: 1.2rem;
-            }
-
-            .the_finals_logo {
-                margin-top: 1rem;
-                margin-bottom: 0rem;
-            }
-        }
     </style>
 </head>
 
 <body>
-
     <img src="the_finals_logo.png" alt="The Finals logo" width="100" class="the_finals_logo">
 
     <main>
         <div class="chart-wrapper">
             <canvas id="rankChart"></canvas>
         </div>
+                <div class="controls">
+            <button id="btnScore" class="active" onclick="updateView('score')">Score View</button>
+            <button id="btnRank" onclick="updateView('rank')">Rank View</button>
+        </div>
     </main>
 
     <footer>
         <a href="https://albinkempe.github.io/hsd/">HSD Esports</a>
-        <span class="sep">·</span>
-        <a href="ruby.html">Ruby View</a>
     </footer>
 
     <script>
         const csvUrl = 'rank_data.csv';
+        let chartInstance = null;
+        let globalLabels = [];
+        let globalDatasets = [];
+        let currentView = 'score'; // 'score' or 'rank'
 
         async function fetchData() {
             try {
@@ -132,7 +132,7 @@
                 .filter(row => row.RecordedAt && row.steamName)
                 .sort((a, b) => new Date(a.RecordedAt) - new Date(b.RecordedAt));
 
-            const labels = [...new Set(cleanData.map(item => formatDate(item.RecordedAt.split(' ')[0])))];
+            globalLabels = [...new Set(cleanData.map(item => formatDate(item.RecordedAt.split(' ')[0])))];
 
             const groupedByPlayer = cleanData.reduce((acc, item) => {
                 const playerName = item.steamName;
@@ -140,16 +140,16 @@
 
                 acc[playerName].push({
                     x: formatDate(item.RecordedAt.split(' ')[0]),
-                    y: item.rankScore,
+                    score: item.rankScore,
                     rank: item.rank,
                     league: item.league
                 });
                 return acc;
             }, {});
 
-            const colors = typeof chartColors !== 'undefined' ? chartColors : ['#ff0df7', '#ff7a0d', '#0dff25'];
+            const colors = ['#ff0df7', '#ff7a0d', '#0dff25'];
 
-            const datasets = Object.keys(groupedByPlayer).map((player, index) => {
+            globalDatasets = Object.keys(groupedByPlayer).map((player, index) => {
                 const color = colors[index % colors.length];
                 return {
                     label: player,
@@ -160,103 +160,130 @@
                     pointBorderColor: color,
                     borderWidth: 2,
                     pointRadius: 3,
-                    pointHoverRadius: 5,
-                    pointHitRadius: 8,
                     tension: 0,
-                    fill: false,
-                    pointStyle: 'circle'
+                    parsing: {
+                        yAxisKey: 'score' // Default parsing key
+                    }
                 };
             });
 
-            renderChart(labels, datasets);
+            renderChart();
         }
 
-        function renderChart(labels, datasets) {
-            const ctx = document.getElementById('rankChart').getContext('2d');
+        function updateView(view) {
+            currentView = view;
 
+            // UI Toggle
+            document.getElementById('btnScore').classList.toggle('active', view === 'score');
+            document.getElementById('btnRank').classList.toggle('active', view === 'rank');
+
+            // Update Y-Axis settings
+            chartInstance.options.scales.y.reverse = (view === 'rank');
+            chartInstance.options.scales.y.title.text = view === 'score' ? 'Rank Score' : 'Leaderboard Rank';
+
+            // Suggest specific bounds for Rank view so the Top 500 line is visible
+            if (view === 'rank') {
+                chartInstance.options.scales.y.suggestedMin = 1;
+                chartInstance.options.scales.y.suggestedMax = 1000;
+                chartInstance.options.scales.y.ticks.stepSize = 250;
+            } else {
+                chartInstance.options.scales.y.suggestedMin = 30000;
+                chartInstance.options.scales.y.suggestedMax = 50000;
+                chartInstance.options.scales.y.ticks.stepSize = 2500;
+            }
+
+            // Swap annotations based on view
+            chartInstance.options.plugins.annotation.annotations = getAnnotations(view);
+
+            chartInstance.data.datasets.forEach(dataset => {
+                dataset.parsing.yAxisKey = view;
+            });
+
+            chartInstance.update();
+        }
+
+        function getAnnotations(view) {
+            if (view === 'rank') {
+                // Annotations for Top 500 Rank
+                return {
+                    top500Zone: {
+                        type: 'box',
+                        yMin: 1,
+                        yMax: 500,
+                        backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                        borderColor: 'transparent',
+                        drawTime: 'beforeDatasetsDraw'
+                    },
+                    top500Line: {
+                        type: 'line',
+                        yMin: 500,
+                        yMax: 500,
+                        borderColor: 'rgba(255, 0, 0, 0.6)',
+                        borderWidth: 3,
+                    }
+                };
+            } else {
+                // Original Score Annotations
+                return {
+                    diamondZone: {
+                        type: 'box',
+                        yMin: 40000,
+                        yMax: 50000,
+                        backgroundColor: 'rgba(0, 251, 255, 0.1)',
+                        borderColor: 'transparent'
+                    },
+                    diamondLine: {
+                        type: 'line',
+                        yMin: 40000,
+                        yMax: 40000,
+                        borderColor: 'rgba(0, 251, 255, 0.6)',
+                        borderWidth: 3,
+                        drawTime: 'beforeDatasetsDraw'
+                    }
+                };
+            }
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('rankChart').getContext('2d');
             Chart.defaults.color = '#a0a0a0';
             Chart.defaults.borderColor = '#1a4875';
-            Chart.defaults.font.family = "'Segoe UI', 'Roboto', sans-serif";
 
-            new Chart(ctx, {
+            chartInstance = new Chart(ctx, {
                 type: 'line',
-                data: { labels, datasets },
+                data: { labels: globalLabels, datasets: globalDatasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        annotation: {
-                            annotations: {
-                                diamondZone: {
-                                    type: 'box',
-                                    yMin: 40000,
-                                    yMax: 47500,
-                                    backgroundColor: 'rgba(0, 251, 255, 0.1)',
-                                    borderColor: 'transparent'
-                                },
-                                diamondLine: {
-                                    type: 'line',
-                                    yMin: 40000,
-                                    yMax: 40000,
-                                    borderColor: 'rgba(0, 251, 255, 0.6)',
-                                    borderWidth: 3,
-                                    drawTime: 'beforeDatasetsDraw'
-                                }
-                            }
-                        },
+                        annotation: { annotations: getAnnotations() },
                         legend: {
                             position: 'top',
-                            labels: {
-                                usePointStyle: true,
-                                color: '#ffffff',
-                                font: { weight: 'bold', size: 14 },
-                                padding: 15,
-                                boxWidth: 6,
-                                boxHeight: 6
-                            }
+                            labels: { color: '#ffffff', font: { weight: 'bold' }, usePointStyle: true }
                         },
                         tooltip: {
                             backgroundColor: '#080224',
-                            titleColor: '#fff',
-                            bodyColor: '#fff',
-                            padding: 10,
                             borderColor: '#383264',
                             borderWidth: 2,
-                            boxWidth: 6,
-                            boxHeight: 6,
-                            usePointStyle: true,
-                            displayColors: false,
                             callbacks: {
                                 label: function (context) {
-                                    const player = context.dataset.label;
-                                    const score = context.parsed.y.toLocaleString();
-                                    const { rank, league } = context.raw;
-                                    const formattedRank = rank ? rank.toLocaleString() : 'N/A';
-
+                                    const raw = context.raw;
                                     return [
-                                        `Player: ${player}`,
-                                        `Score: ${score}`,
-                                        `Rank: ${formattedRank}`,
-                                        `League: ${league}`
+                                        `Player: ${context.dataset.label}`,
+                                        `Score: ${raw.score.toLocaleString()}`,
+                                        `Rank: ${raw.rank ? raw.rank.toLocaleString() : 'N/A'}`,
+                                        `League: ${raw.league}`
                                     ];
-                                },
+                                }
                             }
                         }
                     },
                     scales: {
-                        x: {
-                            grid: { display: false },
-                            offset: true,
-                            ticks: {
-                                maxRotation: 45,
-                                minRotation: 0
-                            }
-                        },
+                        x: { grid: { display: false } },
                         y: {
-                            suggestedMin: 30000,
-                            suggestedMax: 47500,
+                            reverse: false, // Will be flipped for Rank view
+                            title: { display: true, text: 'Rank Score', color: '#fff' },
                             grid: { color: '#1a4875' },
-                            title: { display: false },
                             ticks: { stepSize: 2500}
                         }
                     }
