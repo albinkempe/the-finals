@@ -20,8 +20,11 @@
             <canvas id="rankChart"></canvas>
         </div>
         <div class="controls">
-            <button id="btnScore" class="active" onclick="updateView('score')">Score View</button>
-            <button id="btnRank" onclick="updateView('rank')">Rank View</button>
+            <div class="view-buttons">
+                <button id="btnScore" class="active" onclick="updateView('score')">Score View</button>
+                <button id="btnRank" onclick="updateView('rank')">Rank View</button>
+            </div>
+            <select id="seasonSelect" title="Select season"></select>
         </div>
     </main>
 

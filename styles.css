@@ -33,10 +33,27 @@ main {
 .controls {
     margin-top: 20px;
     display: flex;
+    flex-direction: column;
+    
+}
+
+.controls select {
+    background: #3b006a;
+    color: white;
+    border: none;
+    padding: 12px 10px;
+    font-weight: bold;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.view-buttons {
+    display: flex;
+    margin-bottom: 10px;
     gap: 0px;
 }
 
-.controls button {
+.view-buttons button {
     background: #45007e;
     border: none;
     color: white;
