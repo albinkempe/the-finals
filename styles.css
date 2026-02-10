@@ -98,6 +98,10 @@ footer a {
 }
 
 @media (max-width: 600px) {
+    .the_finals_logo {
+        width: 60px;
+    }
+
     .main {
         width: 100%;
         padding: 10px;
