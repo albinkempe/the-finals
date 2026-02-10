@@ -27,7 +27,7 @@ const CONFIG = {
     },
     dataset: {
         borderWidth: 2,
-        pointRadius: 3,
+        pointRadius: 0,
         pointHoverRadius: 5,
         pointHitRadius: 8
     }
