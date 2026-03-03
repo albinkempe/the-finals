@@ -1,6 +1,7 @@
 // ============ Configuration ============
 const CONFIG = {
     csvUrl: 'rank_data.csv',
+    seasonsUrl: 'seasons.csv',
     playerColors: ['#ff0df7', '#ff7a0d', '#0dff25'],
     views: {
         score: {
@@ -35,14 +36,16 @@ let chartData = { labels: [], datasets: [] };
 let currentView = 'score';
 let fullData = [];
 let currentSeason = 'All';
+let seasonsMap = {}; // e.g. { S9: { startDate: '2025-12-10', endDate: '2026-03-18' } }
 
 // ============ Utilities ============
-const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const getDayInSeason = (timestamp, season) => {
+    const info = seasonsMap[season ? season.toUpperCase() : ''];
+    if (!info) return timestamp.split(' ')[0]; // fallback to date string
+    const start = new Date(info.startDate);
+    const date = new Date(timestamp.split(' ')[0]);
+    return Math.floor((date - start) / 86400000) + 1;
 };
-
-const getDateFromTimestamp = (timestamp) => formatDate(timestamp.split(' ')[0]);
 
 const createDataset = (player, data, color) => ({
     label: player,
@@ -72,9 +75,33 @@ function showLoading(visible) {
 async function fetchData() {
     showLoading(true);
     try {
-        const response = await fetch(CONFIG.csvUrl);
-        const csvText = await response.text();
-        Papa.parse(csvText, {
+        const [rankResponse, seasonsResponse] = await Promise.all([
+            fetch(CONFIG.csvUrl),
+            fetch(CONFIG.seasonsUrl)
+        ]);
+        const [rankCsv, seasonsCsv] = await Promise.all([
+            rankResponse.text(),
+            seasonsResponse.text()
+        ]);
+
+        // Parse seasons first
+        Papa.parse(seasonsCsv, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                results.data.forEach(row => {
+                    if (row.season) {
+                        seasonsMap[row.season.toUpperCase()] = {
+                            startDate: row.startDate,
+                            endDate: row.endDate
+                        };
+                    }
+                });
+            }
+        });
+
+        // Then parse rank data
+        Papa.parse(rankCsv, {
             header: true,
             dynamicTyping: true,
             skipEmptyLines: true,
@@ -96,7 +123,6 @@ function processData(data) {
         .filter(row => row.recordedAt && row.steamName)
         .sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt));
 
-    // Save full cleaned data (normalize season to uppercase)
     fullData = cleanData.map(item => ({
         ...item,
         season: item.season ? String(item.season).toUpperCase() : item.season
@@ -105,7 +131,6 @@ function processData(data) {
     const seasons = [...new Set(fullData.map(item => item.season))].filter(s => s !== undefined && s !== null);
     populateSeasonOptions(seasons);
 
-    // Default to the latest season
     if (seasons.length > 0) currentSeason = seasons[seasons.length - 1];
     buildChartDataForSeason(currentSeason);
 }
@@ -128,8 +153,6 @@ function populateSeasonOptions(seasons) {
     });
 
     select.value = currentSeason || seasons[seasons.length - 1] || 'All';
-
-    // Fix: wire up the change event listener
     select.addEventListener('change', (e) => updateSeasonSelect(e.target.value));
 }
 
@@ -158,17 +181,20 @@ function buildChartDataForSeason(season) {
         ? fullData.filter(item => item.season === season)
         : fullData.slice();
 
-    chartData.labels = [...new Set(filtered.map(item => getDateFromTimestamp(item.recordedAt)))];
+    // Build sorted unique day labels, always starting from day 1
+    const daySet = new Set(filtered.map(item => getDayInSeason(item.recordedAt, item.season)));
+    chartData.labels = [1, ...[...daySet].filter(d => d !== 1)].sort((a, b) => a - b);
 
     const groupedByPlayer = filtered.reduce((acc, item) => {
         const playerName = item.steamName;
         if (!acc[playerName]) acc[playerName] = [];
         acc[playerName].push({
-            x: getDateFromTimestamp(item.recordedAt),
+            x: getDayInSeason(item.recordedAt, item.season),
             score: item.rankScore,
             rank: item.rank,
             league: item.league,
-            season: item.season
+            season: item.season,
+            date: item.recordedAt.split(' ')[0]
         });
         return acc;
     }, {});
@@ -225,6 +251,8 @@ function getAnnotations(view) {
 // ============ Chart Rendering ============
 function getChartOptions() {
     const bounds = getViewBounds(currentSeason);
+    const showingMultiSeason = !currentSeason || currentSeason === 'All';
+
     return {
         responsive: true,
         maintainAspectRatio: false,
@@ -257,7 +285,6 @@ function getChartOptions() {
                         });
                     }
                 },
-                // Click legend item to isolate/toggle player
                 onClick: (e, legendItem, legend) => {
                     const index = legendItem.datasetIndex;
                     const ci = legend.chart;
@@ -286,21 +313,40 @@ function getChartOptions() {
                 usePointStyle: true,
                 displayColors: false,
                 callbacks: {
+                    title: (items) => {
+                        const day = items[0]?.label;
+                        return showingMultiSeason ? `Day ${day}` : `Day ${day}`;
+                    },
                     label: (context) => {
-                        const { score, rank, league } = context.raw;
+                        const { score, rank, league, season, date } = context.raw;
                         const lines = [
                             `Player: ${context.dataset.label}`,
+                            `Date: ${date}`,
                             `Score: ${score ? score.toLocaleString() : 'N/A'}`,
                             `League: ${league}`
                         ];
-                        if (rank != null) lines.splice(2, 0, `Rank: ${rank.toLocaleString()}`);
+                        if (rank != null) lines.splice(3, 0, `Rank: ${rank.toLocaleString()}`);
+                        if (showingMultiSeason) lines.push(`Season: ${season}`);
                         return lines;
                     }
                 }
             }
         },
         scales: {
-            x: { grid: { display: false }, offset: true },
+            x: {
+                type: 'linear',
+                grid: { display: false },
+                min: 1,
+                title: {
+                    display: true,
+                    text: showingMultiSeason ? 'Day of Season' : `Day of ${currentSeason}`,
+                    color: '#fff'
+                },
+                ticks: {
+                    maxTicksLimit: 10,
+                    callback: (val) => `Day ${val}`
+                }
+            },
             y: {
                 reverse: CONFIG.views[currentView].reverse,
                 title: { display: true, text: CONFIG.views[currentView].label, color: '#fff' },
