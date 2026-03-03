@@ -5,15 +5,11 @@ const CONFIG = {
     views: {
         score: {
             label: 'Rank Score',
-            yMin: 30000,
-            yMax: 50000,
             stepSize: 2500,
             reverse: false
         },
         rank: {
             label: 'Leaderboard Rank',
-            yMin: 1,
-            yMax: 1000,
             stepSize: 250,
             reverse: true
         }
@@ -65,8 +61,16 @@ const createDataset = (player, data, color) => ({
     parsing: { yAxisKey: currentView }
 });
 
+// ============ Loading Indicator ============
+function showLoading(visible) {
+    let indicator = document.getElementById('loadingIndicator');
+    if (!indicator) return;
+    indicator.style.display = visible ? 'flex' : 'none';
+}
+
 // ============ Data Processing ============
 async function fetchData() {
+    showLoading(true);
     try {
         const response = await fetch(CONFIG.csvUrl);
         const csvText = await response.text();
@@ -74,10 +78,14 @@ async function fetchData() {
             header: true,
             dynamicTyping: true,
             skipEmptyLines: true,
-            complete: (results) => processData(results.data)
+            complete: (results) => {
+                processData(results.data);
+                showLoading(false);
+            }
         });
     } catch (error) {
         console.error("Error loading CSV:", error);
+        showLoading(false);
     }
 }
 
@@ -88,25 +96,25 @@ function processData(data) {
         .filter(row => row.recordedAt && row.steamName)
         .sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt));
 
-    // Save full cleaned data (normalize season to uppercase) and populate season selector
+    // Save full cleaned data (normalize season to uppercase)
     fullData = cleanData.map(item => ({
         ...item,
         season: item.season ? String(item.season).toUpperCase() : item.season
     }));
+
     const seasons = [...new Set(fullData.map(item => item.season))].filter(s => s !== undefined && s !== null);
     populateSeasonOptions(seasons);
 
-    // Build chart for current season (default first available)
-    if (currentSeason === 'All' && seasons.length > 0) currentSeason = seasons[0];
+    // Default to the latest season
+    if (seasons.length > 0) currentSeason = seasons[seasons.length - 1];
     buildChartDataForSeason(currentSeason);
 }
 
 function populateSeasonOptions(seasons) {
     const select = document.getElementById('seasonSelect');
     if (!select) return;
-    // Clear existing
     select.innerHTML = '';
-    // Add 'All' option
+
     const allOpt = document.createElement('option');
     allOpt.value = 'All';
     allOpt.textContent = 'All Seasons';
@@ -119,16 +127,39 @@ function populateSeasonOptions(seasons) {
         select.appendChild(opt);
     });
 
-    select.value = currentSeason || 'All';
+    select.value = currentSeason || seasons[seasons.length - 1] || 'All';
+
+    // Fix: wire up the change event listener
+    select.addEventListener('change', (e) => updateSeasonSelect(e.target.value));
+}
+
+function getViewBounds(season) {
+    const filtered = season && season !== 'All'
+        ? fullData.filter(item => item.season === season)
+        : fullData.slice();
+
+    const scores = filtered.map(item => item.rankScore).filter(Boolean);
+    const ranks = filtered.map(item => item.rank).filter(Boolean);
+
+    return {
+        score: {
+            yMin: scores.length ? Math.floor(Math.min(...scores) / 2500) * 2500 - 2500 : 30000,
+            yMax: scores.length ? Math.ceil(Math.max(...scores) / 2500) * 2500 + 2500 : 50000,
+        },
+        rank: {
+            yMin: 1,
+            yMax: ranks.length ? Math.ceil(Math.max(...ranks) / 250) * 250 + 250 : 1000,
+        }
+    };
 }
 
 function buildChartDataForSeason(season) {
-    const filtered = season && season !== 'All' ? fullData.filter(item => item.season == season) : fullData.slice();
+    const filtered = season && season !== 'All'
+        ? fullData.filter(item => item.season === season)
+        : fullData.slice();
 
-    // Extract unique dates
     chartData.labels = [...new Set(filtered.map(item => getDateFromTimestamp(item.recordedAt)))];
 
-    // Group data by player
     const groupedByPlayer = filtered.reduce((acc, item) => {
         const playerName = item.steamName;
         if (!acc[playerName]) acc[playerName] = [];
@@ -142,7 +173,6 @@ function buildChartDataForSeason(season) {
         return acc;
     }, {});
 
-    // Create datasets for each player
     chartData.datasets = Object.entries(groupedByPlayer).map(([player, playerData], index) => {
         const color = CONFIG.playerColors[index % CONFIG.playerColors.length];
         return createDataset(player, playerData, color);
@@ -194,9 +224,11 @@ function getAnnotations(view) {
 
 // ============ Chart Rendering ============
 function getChartOptions() {
+    const bounds = getViewBounds(currentSeason);
     return {
         responsive: true,
         maintainAspectRatio: false,
+        animation: { duration: 150 },
         plugins: {
             annotation: { annotations: getAnnotations(currentView) },
             legend: {
@@ -207,7 +239,39 @@ function getChartOptions() {
                     usePointStyle: true,
                     padding: 15,
                     boxWidth: 6,
-                    boxHeight: 6
+                    boxHeight: 6,
+                    generateLabels: (chart) => {
+                        return chart.data.datasets.map((dataset, i) => {
+                            const hidden = !chart.isDatasetVisible(i);
+                            const color = dataset.borderColor;
+                            return {
+                                text: dataset.label,
+                                fillStyle: hidden ? '#555' : color,
+                                strokeStyle: hidden ? '#555' : color,
+                                fontColor: hidden ? '#666' : '#ffffff',
+                                hidden: false,
+                                datasetIndex: i,
+                                pointStyle: 'circle',
+                                lineWidth: 0
+                            };
+                        });
+                    }
+                },
+                // Click legend item to isolate/toggle player
+                onClick: (e, legendItem, legend) => {
+                    const index = legendItem.datasetIndex;
+                    const ci = legend.chart;
+                    const onlyThisVisible = ci.data.datasets.every((_, i) =>
+                        i === index ? ci.isDatasetVisible(i) : !ci.isDatasetVisible(i)
+                    );
+
+                    if (onlyThisVisible) {
+                        ci.data.datasets.forEach((_, i) => ci.show(i));
+                    } else {
+                        ci.data.datasets.forEach((_, i) => {
+                            i === index ? ci.show(i) : ci.hide(i);
+                        });
+                    }
                 }
             },
             tooltip: {
@@ -224,12 +288,13 @@ function getChartOptions() {
                 callbacks: {
                     label: (context) => {
                         const { score, rank, league } = context.raw;
-                        return [
+                        const lines = [
                             `Player: ${context.dataset.label}`,
-                            `Score: ${score.toLocaleString()}`,
-                            `Rank: ${rank ? rank.toLocaleString() : 'N/A'}`,
+                            `Score: ${score ? score.toLocaleString() : 'N/A'}`,
                             `League: ${league}`
                         ];
+                        if (rank != null) lines.splice(2, 0, `Rank: ${rank.toLocaleString()}`);
+                        return lines;
                     }
                 }
             }
@@ -240,8 +305,8 @@ function getChartOptions() {
                 reverse: CONFIG.views[currentView].reverse,
                 title: { display: true, text: CONFIG.views[currentView].label, color: '#fff' },
                 grid: { color: CONFIG.chart.gridColor },
-                min: CONFIG.views[currentView].yMin,
-                suggestedMax: CONFIG.views[currentView].yMax,
+                min: bounds[currentView].yMin,
+                suggestedMax: bounds[currentView].yMax,
                 ticks: { stepSize: CONFIG.views[currentView].stepSize },
                 afterFit: (axis) => { axis.width = 80; }
             }
@@ -269,7 +334,7 @@ function renderChart() {
 // ============ View Management ============
 function updateView(view) {
     currentView = view;
-    
+
     document.getElementById('btnScore').classList.toggle('active', view === 'score');
     document.getElementById('btnRank').classList.toggle('active', view === 'rank');
 
