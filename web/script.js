@@ -407,10 +407,9 @@ function getChartOptions() {
                 min: bounds[currentView].yMin,
                 suggestedMax: bounds[currentView].yMax,
                 ticks: {
-                    stepSize: CONFIG.views[currentView].stepSize,
-                    font: { size: window.innerWidth < 600 ? 10 : 12 }
+                    stepSize: CONFIG.views[currentView].stepSize
                 },
-                afterFit: (axis) => { axis.width = window.innerWidth < 600 ? 55 : 80; }
+                afterFit: (axis) => { axis.width = 80; }
             }
         }
     };
