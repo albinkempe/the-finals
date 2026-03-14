@@ -64,6 +64,53 @@ const createDataset = (player, data, color) => ({
     parsing: { yAxisKey: currentView }
 });
 
+// ============ Delta Label Plugin ============
+const deltaLabelPlugin = {
+    id: 'deltaLabel',
+    afterDatasetsDraw(chart) {
+        const { ctx, scales: { x, y } } = chart;
+        const yKey = currentView; // 'score' or 'rank'
+
+        chart.data.datasets.forEach((dataset, i) => {
+            if (!chart.isDatasetVisible(i)) return;
+
+            const points = dataset.data;
+            if (!points || points.length < 2) return;
+
+            const last = points[points.length - 1];
+            const prev = points[points.length - 2];
+
+            const lastVal = last[yKey];
+            const prevVal = prev[yKey];
+            if (lastVal == null || prevVal == null) return;
+
+            const delta = lastVal - prevVal;
+            if (delta === 0) return;
+
+            // For rank view, lower rank number = improvement, so flip sign for display
+            const displayDelta = yKey === 'rank' ? -delta : delta;
+            const sign = displayDelta > 0 ? '+' : '';
+            const label = `${sign}${displayDelta.toLocaleString()}`;
+
+            const xPx = x.getPixelForValue(last.x) + 8;
+            const yPx = y.getPixelForValue(lastVal);
+
+            ctx.save();
+            ctx.font = 'bold 11px "Segoe UI", Roboto, Arial, sans-serif';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'left';
+
+            // Colour: green-ish for improvement, red-ish for decline
+            // Improvement = score up OR rank number down
+            const isImprovement = displayDelta > 0;
+            ctx.fillStyle = isImprovement ? '#4dff91' : '#ff4d6d';
+
+            ctx.fillText(label, xPx, yPx);
+            ctx.restore();
+        });
+    }
+};
+
 // ============ Loading Indicator ============
 function showLoading(visible) {
     let indicator = document.getElementById('loadingIndicator');
@@ -257,6 +304,9 @@ function getChartOptions() {
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 150 },
+        layout: {
+            padding: { right: 60 } // room for delta labels
+        },
         plugins: {
             annotation: { annotations: getAnnotations(currentView) },
             legend: {
@@ -373,7 +423,8 @@ function renderChart() {
     chartInstance = new Chart(ctx, {
         type: 'line',
         data: { labels: chartData.labels, datasets: chartData.datasets },
-        options: getChartOptions()
+        options: getChartOptions(),
+        plugins: [deltaLabelPlugin]
     });
 }
 
