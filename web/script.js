@@ -1,7 +1,9 @@
 // ============ Configuration ============
 const CONFIG = {
-    csvUrl: 'data/rank_data.csv',
-    seasonsUrl: 'data/seasons.csv',
+    csvUrl: '../data/rank_data.csv',
+    seasonsUrl: '../data/seasons.csv',
+    //csvUrl: 'data/rank_data.csv',
+    //seasonsUrl: 'data/seasons.csv',
     playerColors: ['#ff0df7', '#ff7a0d', '#0dff25'],
     views: {
         score: {
@@ -305,7 +307,7 @@ function getChartOptions() {
         maintainAspectRatio: false,
         animation: { duration: 150 },
         layout: {
-            padding: { right: 60 } // room for delta labels
+            padding: { right: 50 } // room for delta labels
         },
         plugins: {
             annotation: { annotations: getAnnotations(currentView) },
@@ -388,7 +390,7 @@ function getChartOptions() {
                 grid: { display: false },
                 min: 1,
                 title: {
-                    display: true,
+                    display: false,
                     text: showingMultiSeason ? 'Day of Season' : `Day of ${currentSeason}`,
                     color: '#fff'
                 },
