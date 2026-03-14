@@ -409,7 +409,7 @@ function getChartOptions() {
                 ticks: {
                     stepSize: CONFIG.views[currentView].stepSize
                 },
-                afterFit: (axis) => { axis.width = 80; }
+                afterFit: (axis) => { axis.width = 70; }
             }
         }
     };
