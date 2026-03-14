@@ -4,7 +4,7 @@ const CONFIG = {
     //seasonsUrl: '../data/seasons.csv',
     csvUrl: 'data/rank_data.csv',
     seasonsUrl: 'data/seasons.csv',
-    playerColors: ['#B815FF', '#FFB815', '#5CFF15'],
+    playerColors: ['#FA00FF', '#FF7B00', '#05FF00'],
     views: {
         score: {
             label: 'Rank Score',
@@ -105,7 +105,7 @@ const deltaLabelPlugin = {
             // Colour: green-ish for improvement, red-ish for decline
             // Improvement = score up OR rank number down
             const isImprovement = displayDelta > 0;
-            ctx.fillStyle = isImprovement ? '#4dff91' : '#ff4d6d';
+            ctx.fillStyle = isImprovement ? '#0084FF' : '#FF4315';
 
             ctx.fillText(label, xPx, yPx);
             ctx.restore();
