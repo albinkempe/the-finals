@@ -98,7 +98,7 @@ const deltaLabelPlugin = {
             const yPx = y.getPixelForValue(lastVal);
 
             ctx.save();
-            ctx.font = 'bold 11px "Segoe UI", Roboto, Arial, sans-serif';
+            ctx.font = `bold ${window.innerWidth < 600 ? '9px' : '11px'} "Segoe UI", Roboto, Arial, sans-serif`;
             ctx.textBaseline = 'middle';
             ctx.textAlign = 'left';
 
@@ -307,12 +307,13 @@ function getChartOptions() {
         maintainAspectRatio: false,
         animation: { duration: 150 },
         layout: {
-            padding: { right: 50 } // room for delta labels
+            padding: { right: window.innerWidth < 600 ? 30 : 50 }
         },
         plugins: {
             annotation: { annotations: getAnnotations(currentView) },
             legend: {
                 position: 'top',
+                align: 'center',
                 labels: {
                     color: '#ffffff',
                     font: { weight: 'bold' },
@@ -405,8 +406,11 @@ function getChartOptions() {
                 grid: { color: CONFIG.chart.gridColor },
                 min: bounds[currentView].yMin,
                 suggestedMax: bounds[currentView].yMax,
-                ticks: { stepSize: CONFIG.views[currentView].stepSize },
-                afterFit: (axis) => { axis.width = 80; }
+                ticks: {
+                    stepSize: CONFIG.views[currentView].stepSize,
+                    font: { size: window.innerWidth < 600 ? 10 : 12 }
+                },
+                afterFit: (axis) => { axis.width = window.innerWidth < 600 ? 55 : 80; }
             }
         }
     };
@@ -452,3 +456,10 @@ function updateSeasonSelect(season) {
 
 // ============ Initialize ============
 fetchData();
+
+window.addEventListener('resize', () => {
+    if (chartInstance) {
+        chartInstance.options = getChartOptions();
+        chartInstance.update();
+    }
+});

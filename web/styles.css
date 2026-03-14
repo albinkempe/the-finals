@@ -161,7 +161,7 @@ footer a {
 @media (max-width: 600px) {
     .chart-wrapper {
         position: relative;
-        height: 72vh;
+        height: 69vh;
         width: 100%;
     }
 
