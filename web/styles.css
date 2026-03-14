@@ -2,7 +2,7 @@
     --bg-color: #080224;
     --text-main: #ffffff;
     --text-dim: #a0a0a0;
-    --accent: #ff0df7;
+    --accent: #B815FF;
 }
 
 body {
@@ -14,86 +14,57 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: space-around;
+}
+
+header {
+    width: 100%;
+    background-color: #FF8C00;
+    display: flex;
+    flex-direction: row;
+    justify-content: left;
+    align-items: center;
+    height: 50px;
+}
+
+.title {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    background-color: #FF4315;
+    height: 100%;
+}
+
+.the_finals_logo {
+    margin-top: 0rem;
+    margin-bottom: 0rem;
+    margin-left: 10px
+}
+
+h1 {
+    font-size: 1.4rem;
+    margin-left: 15px;
+    margin-right: 15px;
 }
 
 main {
     width: 95%;
-    padding: 20px;
-    border-radius: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
-}
-
-.the_finals_logo {
-    margin-top: 2rem;
-    margin-bottom: 0rem;
-}
-
-.controls {
-    margin-top: 20px;
-    display: flex;
-    flex-direction: row;
-    gap: 20px;
-}
-
-.controls select {
-    background: #8c00ff;
-    color: white;
-    border: none;
-    padding: 12px 10px;
-    font-weight: bold;
-    border-radius: 10px;
-    cursor: pointer;
-    height: 40px;
-}
-
-.view-buttons {
-    display: flex;
-    margin-bottom: 10px;
-    gap: 0px;
-    height: 40px;
-}
-
-.view-buttons button {
-    background: #45007e;
-    border: none;
-    color: #a49aac;
-    padding: 12px 12px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: all 0.2s;
-}
-
-#btnScore {
-    border-top-left-radius: 10px;
-    border-bottom-left-radius: 10px;
-}
-
-#btnRank {
-    border-top-right-radius: 10px;
-    border-bottom-right-radius: 10px;
-}
-
-.controls button.active {
-    background: #8c00ff;
-    color: white;
-}
-
-.controls button:hover:not(.active) {
-    background: #6100b1;
-    color: white;
+    margin-top: 10px;
 }
 
 .chart-wrapper {
     position: relative;
-    height: 85vh;
+    height: 88vh;
     width: 100%;
 }
 
 .chart-wrapper canvas {
     transition: opacity 0.15s ease;
 }
+
 .loading-indicator {
     position: absolute;
     inset: 0;
@@ -117,38 +88,77 @@ main {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.controls {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+}
+
+.controls select {
+    background: #B815FF;
+    color: white;
+    border: none;
+    padding: 12px 10px;
+    font-weight: bold;
+    cursor: pointer;
+    height: 40px;
+    width: 200px;
+}
+
+.view-buttons {
+    display: flex;
+    margin-bottom: 10px;
+    gap: 0px;
+    height: 40px;
+}
+
+.view-buttons button {
+    background: #45007e;
+    border: none;
+    color: #a49aac;
+    padding: 12px 12px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+    width: 100px;
+}
+
+.controls button.active {
+    background: #B815FF;
+    color: white;
+}
+
+.controls button:hover:not(.active) {
+    background: #9b11d6;
+    color: white;
 }
 
 footer {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    background-color: #130554;
+    width: 100%;
+    height: 50px;
+    color: #ffffff;
+    font-weight: bold;
     margin-top: 80px;
-    margin-bottom: 20px;
     font-size: 0.9rem;
 }
 
 footer a {
-    color: var(--text-dim);
+    color: #ffffff;
+    text-decoration: none;
 }
 
 @media (max-width: 600px) {
-    .the_finals_logo {
-        width: 60px;
-    }
-
-    .main {
-        width: 100%;
-        padding: 10px;
-    }
-
-    .container {
-        padding: 10px;
-        width: 100%;
-    }
-
-    h1 {
-        font-size: 1.2rem;
-    }
-
     .chart-wrapper {
         position: relative;
         height: 72vh;

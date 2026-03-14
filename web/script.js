@@ -4,7 +4,7 @@ const CONFIG = {
     //seasonsUrl: '../data/seasons.csv',
     csvUrl: 'data/rank_data.csv',
     seasonsUrl: 'data/seasons.csv',
-    playerColors: ['#ff0df7', '#ff7a0d', '#0dff25'],
+    playerColors: ['#B815FF', '#FFB815', '#5CFF15'],
     views: {
         score: {
             label: 'Rank Score',
@@ -22,7 +22,7 @@ const CONFIG = {
         defaultBorderColor: '#1a4875',
         gridColor: '#1a4875',
         tooltipBg: '#080224',
-        tooltipBorder: '#383264'
+        tooltipBorder: '#15D1FF'
     },
     dataset: {
         borderWidth: 2,
