@@ -1,9 +1,9 @@
 // ============ Configuration ============
 const CONFIG = {
-    //csvUrl: '../data/rank_data.csv',
-    //seasonsUrl: '../data/seasons.csv',
-    csvUrl: 'data/rank_data.csv',
-    seasonsUrl: 'data/seasons.csv',
+    csvUrl: '../data/rank_data.csv',
+    seasonsUrl: '../data/seasons.csv',
+    //csvUrl: 'data/rank_data.csv',
+    //seasonsUrl: 'data/seasons.csv',
     playerColors: ['#FA00FF', '#FF7B00', '#05FF00'],
     views: {
         score: {
@@ -13,7 +13,7 @@ const CONFIG = {
         },
         rank: {
             label: 'Leaderboard Rank',
-            stepSize: 250,
+            stepSize: 500,
             reverse: true
         }
     },
@@ -360,9 +360,10 @@ function getChartOptions() {
                 bodyColor: '#fff',
                 padding: 10,
                 borderColor: CONFIG.chart.tooltipBorder,
-                borderWidth: 2,
+                borderWidth: 1,
                 boxWidth: 6,
                 boxHeight: 6,
+                cornerRadius: 0,
                 usePointStyle: true,
                 displayColors: false,
                 callbacks: {
@@ -409,7 +410,7 @@ function getChartOptions() {
                 ticks: {
                     stepSize: CONFIG.views[currentView].stepSize
                 },
-                afterFit: (axis) => { axis.width = 70; }
+                afterFit: (axis) => { axis.width = window.innerWidth < 600 ? 70 : 80; }
             }
         }
     };
