@@ -101,6 +101,10 @@ main {
 }
 
 .controls select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border-radius: 0;
     background: #B815FF;
     color: white;
     border: none;
