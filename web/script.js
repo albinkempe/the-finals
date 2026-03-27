@@ -1,9 +1,9 @@
 // ============ Configuration ============
 const CONFIG = {
-    //csvUrl: '../data/rank_data.csv',
-    //seasonsUrl: '../data/seasons.csv',
-    csvUrl: 'data/rank_data.csv',
-    seasonsUrl: 'data/seasons.csv',
+    csvUrl: '../data/rank_data.csv',
+    seasonsUrl: '../data/seasons.csv',
+    //csvUrl: 'data/rank_data.csv',
+    //seasonsUrl: 'data/seasons.csv',
     playerColors: ['#FA00FF', '#FF7B00', '#05FF00'],
     views: {
         score: {
@@ -26,7 +26,7 @@ const CONFIG = {
     },
     dataset: {
         borderWidth: 2,
-        pointRadius: 0,
+        pointRadius: 1,
         pointHoverRadius: 5,
         pointHitRadius: 8
     }
@@ -83,7 +83,8 @@ const createDataset = (player, data, color, isPrevSeason = false) => ({
     pointStyle: 'circle',
     tension: 0,
     isPrevSeason,
-    parsing: { yAxisKey: currentView }
+    parsing: { yAxisKey: currentView },
+    order: 1
 });
 
 // ============ Delta Label Plugin ============
@@ -230,26 +231,34 @@ function buildPlayerData(playerName, season) {
         }));
 }
 
-function getViewBounds(season, extraPoints = []) {
-    const filtered = fullData.filter(item => item.season === season);
+function getViewBounds() {
+    if (fullData.length === 0) {
+        return {
+            score: { yMin: 20000, yMax: 50000 },
+            rank: { yMin: 1, yMax: 10000 }
+        };
+    }
 
-    const scores = filtered.map(item => item.rankScore).filter(Boolean);
-    const ranks = filtered.map(item => item.rank).filter(Boolean);
+    const scores = fullData.map(d => d.rankScore);
+    const rawMinScore = Math.min(...scores);
+    const rawMaxScore = Math.max(...scores);
 
-    // Expand bounds to include prev-season data so the dashed line is never clipped
-    extraPoints.forEach(pt => {
-        if (pt.score) scores.push(pt.score);
-        if (pt.rank) ranks.push(pt.rank);
-    });
+    const globalScoreMin = Math.floor(rawMinScore / 2500) * 2500;
+    const globalScoreMax = Math.ceil((Math.max(rawMaxScore, 40000) + 500) / 2500) * 2500;
+
+    const ranks = fullData.map(d => d.rank).filter(r => r > 0);
+    const globalRankMin = 0;
+    const rawMaxRank = Math.max(...ranks);
+    const globalRankMax = Math.ceil(rawMaxRank / 500) * 500;
 
     return {
         score: {
-            yMin: scores.length ? Math.floor(Math.min(...scores) / 2500) * 2500 - 2500 : 30000,
-            yMax: scores.length ? Math.ceil(Math.max(...scores) / 2500) * 2500 + 2500 : 50000,
+            yMin: globalScoreMin,
+            yMax: globalScoreMax
         },
         rank: {
-            yMin: 1,
-            yMax: ranks.length ? Math.ceil(Math.max(...ranks) / 250) * 250 + 250 : 1000,
+            yMin: globalRankMin,
+            yMax: globalRankMax
         }
     };
 }
@@ -283,44 +292,38 @@ function buildChartDataForSeason(season) {
     renderChart();
 }
 
-// Inject or remove the prev-season dashed dataset for the solo player
 function syncPrevSeasonDataset() {
     if (!chartInstance) return;
 
-    // Always strip any existing prev-season datasets first
     chartInstance.data.datasets = chartInstance.data.datasets.filter(ds => !ds.isPrevSeason);
 
     if (!soloPlayer) {
-        chartInstance.options.scales.y.min = getViewBounds(currentSeason)[currentView].yMin;
-        chartInstance.options.scales.y.suggestedMax = getViewBounds(currentSeason)[currentView].yMax;
-        chartInstance.update('none');
+        chartInstance.options = getChartOptions();
+        chartInstance.update();
         return;
     }
 
     const prevSeason = getPrevSeasonKey(currentSeason, soloPlayer);
     if (!prevSeason) {
-        chartInstance.update('none');
+        chartInstance.options = getChartOptions();
+        chartInstance.update();
         return;
     }
 
     const prevData = buildPlayerData(soloPlayer, prevSeason);
     if (!prevData.length) {
-        chartInstance.update('none');
+        chartInstance.options = getChartOptions();
+        chartInstance.update();
         return;
     }
 
-    // Match the color of the current-season dataset for this player
     const currentDs = chartInstance.data.datasets.find(ds => ds.label === soloPlayer);
     const color = currentDs ? currentDs.borderColor : '#ffffff';
 
     chartInstance.data.datasets.push(createDataset(soloPlayer, prevData, color, true));
 
-    // Expand y-axis to cover prev-season values
-    const bounds = getViewBounds(currentSeason, prevData);
-    chartInstance.options.scales.y.min = bounds[currentView].yMin;
-    chartInstance.options.scales.y.suggestedMax = bounds[currentView].yMax;
-
-    chartInstance.update('none');
+    chartInstance.options = getChartOptions(prevData);
+    chartInstance.update(); // Removed 'none'
 }
 
 // ============ Chart Annotations ============
@@ -329,15 +332,16 @@ function getAnnotations(view) {
         score: {
             diamondZone: {
                 type: 'box',
-                yMin: 40000,
-                yMax: 50000,
+                yScaleID: 'y',
+                yMin: (ctx) => 40000,
                 backgroundColor: 'rgba(0, 251, 255, 0.1)',
                 borderColor: 'transparent'
             },
             diamondLine: {
                 type: 'line',
-                yMin: 40000,
-                yMax: 40000,
+                yScaleID: 'y',
+                yMin: (ctx) => 40000,
+                yMax: (ctx) => 40000,
                 borderColor: 'rgba(0, 251, 255, 0.6)',
                 borderWidth: 3,
                 drawTime: 'beforeDatasetsDraw'
@@ -346,16 +350,18 @@ function getAnnotations(view) {
         rank: {
             top500Zone: {
                 type: 'box',
-                yMin: 1,
-                yMax: 500,
+                yScaleID: 'y',
+                yMin: (ctx) => 1,
+                yMax: (ctx) => 500,
                 backgroundColor: 'rgba(255, 0, 0, 0.1)',
                 borderColor: 'transparent',
                 drawTime: 'beforeDatasetsDraw'
             },
             top500Line: {
                 type: 'line',
-                yMin: 500,
-                yMax: 500,
+                yScaleID: 'y',
+                yMin: (ctx) => 500,
+                yMax: (ctx) => 500,
                 borderColor: 'rgba(255, 0, 0, 0.6)',
                 borderWidth: 3
             }
@@ -365,8 +371,9 @@ function getAnnotations(view) {
 }
 
 // ============ Chart Rendering ============
-function getChartOptions() {
-    const bounds = getViewBounds(currentSeason);
+function getChartOptions(extraPoints = []) {
+    const bounds = getViewBounds(currentSeason, extraPoints);
+    const viewCfg = CONFIG.views[currentView];
 
     return {
         responsive: true,
@@ -472,6 +479,7 @@ function getChartOptions() {
         scales: {
             x: {
                 type: 'linear',
+                offset: true,
                 grid: { display: false },
                 min: 1,
                 title: {
@@ -486,13 +494,21 @@ function getChartOptions() {
                 }
             },
             y: {
-                reverse: CONFIG.views[currentView].reverse,
+                reverse: viewCfg.reverse,
                 title: { display: true, text: CONFIG.views[currentView].label, color: '#fff' },
                 grid: { color: CONFIG.chart.gridColor },
                 min: bounds[currentView].yMin,
+                max: bounds[currentView].yMax,
                 suggestedMax: bounds[currentView].yMax,
                 ticks: {
-                    stepSize: CONFIG.views[currentView].stepSize
+                    stepSize: CONFIG.views[currentView].stepSize,
+                    precision: 0,
+                    callback: function(value) {
+                        if (currentView === 'rank' && value === 0) {
+                            return 1;
+                        }
+                        return value;
+                    }
                 },
                 afterFit: (axis) => { axis.width = window.innerWidth < 600 ? 70 : 80; }
             }
@@ -522,22 +538,17 @@ function renderChart() {
 function updateView(view) {
     currentView = view;
 
+    // Update button UI states
     document.getElementById('btnScore').classList.toggle('active', view === 'score');
     document.getElementById('btnRank').classList.toggle('active', view === 'rank');
 
     if (!chartInstance) return;
-    chartInstance.options = getChartOptions();
+
+    chartInstance.options = getChartOptions(); 
+
     chartInstance.data.datasets.forEach(dataset => {
         dataset.parsing.yAxisKey = view;
     });
-
-    // If a prev-season dataset is present, recalculate bounds with it included
-    const prevDs = chartInstance.data.datasets.find(ds => ds.isPrevSeason);
-    if (prevDs) {
-        const bounds = getViewBounds(currentSeason, prevDs.data);
-        chartInstance.options.scales.y.min = bounds[currentView].yMin;
-        chartInstance.options.scales.y.suggestedMax = bounds[currentView].yMax;
-    }
 
     chartInstance.update();
 }
