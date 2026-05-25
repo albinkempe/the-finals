@@ -81,7 +81,7 @@ const createDataset = (player, data, color, isPrevSeason = false) => ({
     pointHitRadius: isPrevSeason ? 4 : CONFIG.dataset.pointHitRadius,
     fill: false,
     pointStyle: 'circle',
-    tension: 0,
+    tension: window.innerWidth < 600 ? 0.2 : 0,
     isPrevSeason,
     parsing: { yAxisKey: currentView },
     order: 1
