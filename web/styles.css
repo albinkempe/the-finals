@@ -100,6 +100,12 @@ main {
     gap: 20px;
 }
 
+.last-updated {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin: 8px 0 0;
+}
+
 .controls select {
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -172,5 +178,9 @@ footer a {
     .controls {
         flex-direction: column;
         gap: 0px;
+    }
+
+    .last-updated {
+        margin-top: 10px;
     }
 }

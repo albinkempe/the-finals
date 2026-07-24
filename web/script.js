@@ -1,9 +1,9 @@
 // ============ Configuration ============
 const CONFIG = {
-    //csvUrl: '../data/rank_data.csv',
-    //seasonsUrl: '../data/seasons.csv',
-    csvUrl: 'data/rank_data.csv',
-    seasonsUrl: 'data/seasons.csv',
+    csvUrl: '../data/rank_data.csv',
+    seasonsUrl: '../data/seasons.csv',
+    //csvUrl: 'data/rank_data.csv',
+    //seasonsUrl: 'data/seasons.csv',
     playerColors: ['#FA00FF', '#FF7B00', '#05FF00'],
     views: {
         score: {
@@ -49,6 +49,40 @@ const getDayInSeason = (timestamp, season) => {
     const date = new Date(timestamp.split(' ')[0]);
     return Math.floor((date - start) / 86400000);
 };
+
+const getDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const formatUpdatedAt = (timestamp) => {
+    const updatedAt = new Date(timestamp.replace(' ', 'T'));
+    if (Number.isNaN(updatedAt.getTime())) return '';
+
+    const today = new Date();
+    const updatedDate = getDateKey(updatedAt);
+    const todayDate = getDateKey(today);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayDate = getDateKey(yesterday);
+    const time = updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+    if (updatedDate === todayDate) return `Updated @ ${time}`;
+    if (updatedDate === yesterdayDate) return `Updated yesterday @ ${time}`;
+    return `Updated ${updatedDate} @ ${time}`;
+};
+
+function updateLastUpdated(data) {
+    const lastUpdated = document.getElementById('lastUpdated');
+    if (!lastUpdated || data.length === 0) return;
+
+    const latestTimestamp = data.reduce((latest, row) => {
+        return !latest || new Date(row.recordedAt) > new Date(latest) ? row.recordedAt : latest;
+    }, null);
+    lastUpdated.textContent = formatUpdatedAt(latestTimestamp);
+}
 
 // Returns the nearest previous season key that has ranked data for the player, or null.
 const getPrevSeasonKey = (season, playerName) => {
@@ -188,6 +222,8 @@ function processData(data) {
     const cleanData = data
         .filter(row => row.recordedAt && row.steamName)
         .sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt));
+
+    updateLastUpdated(cleanData);
 
     fullData = cleanData.map(item => ({
         ...item,
