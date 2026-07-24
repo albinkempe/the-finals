@@ -1,9 +1,9 @@
 // ============ Configuration ============
 const CONFIG = {
-    csvUrl: '../data/rank_data.csv',
-    seasonsUrl: '../data/seasons.csv',
-    //csvUrl: 'data/rank_data.csv',
-    //seasonsUrl: 'data/seasons.csv',
+    //csvUrl: '../data/rank_data.csv',
+    //seasonsUrl: '../data/seasons.csv',
+    csvUrl: 'data/rank_data.csv',
+    seasonsUrl: 'data/seasons.csv',
     playerColors: ['#FA00FF', '#FF7B00', '#05FF00'],
     views: {
         score: {
