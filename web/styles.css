@@ -121,6 +121,21 @@ main {
     width: 200px;
 }
 
+.controls > button {
+    background: #45007e;
+    border: none;
+    color: #a49aac;
+    padding: 12px;
+    cursor: pointer;
+    font-weight: bold;
+    height: 40px;
+}
+
+.controls > button:hover {
+    background: #9b11d6;
+    color: white;
+}
+
 .view-buttons {
     display: flex;
     margin-bottom: 10px;
@@ -177,7 +192,18 @@ footer a {
 
     .controls {
         flex-direction: column;
-        gap: 0px;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .view-buttons {
+        margin-bottom: 0;
+    }
+
+    .controls > button {
+        align-self: center;
+        margin-top: 4px;
+        width: 200px;
     }
 
     .last-updated {

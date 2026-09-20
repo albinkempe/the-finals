@@ -1,9 +1,7 @@
 // ============ Configuration ============
 const CONFIG = {
-    //csvUrl: '../data/rank_data.csv',
-    //seasonsUrl: '../data/seasons.csv',
-    csvUrl: 'data/rank_data.csv',
-    seasonsUrl: 'data/seasons.csv',
+    csvUrl: '../data/rank_data.csv',
+    seasonsUrl: '../data/seasons.csv',
     playerColors: ['#FA00FF', '#FF7B00', '#05FF00'],
     views: {
         score: {
@@ -267,7 +265,7 @@ function buildPlayerData(playerName, season) {
         }));
 }
 
-function getViewBounds() {
+function getViewBounds(season = currentSeason, extraPoints = []) {
     if (fullData.length === 0) {
         return {
             score: { yMin: 20000, yMax: 50000 },
@@ -275,26 +273,46 @@ function getViewBounds() {
         };
     }
 
-    const scores = fullData.map(d => d.rankScore);
+    const seasonData = fullData.filter(item => item.season === season);
+    const chartPoints = [
+        ...seasonData,
+        ...extraPoints
+    ];
+    const scores = chartPoints
+        .map(d => d.rankScore ?? d.score)
+        .filter(Number.isFinite);
+    const ranks = chartPoints.map(d => d.rank).filter(rank => Number.isFinite(rank) && rank > 0);
+
+    if (scores.length === 0 || ranks.length === 0) {
+        return {
+            score: { yMin: 20000, yMax: 50000 },
+            rank: { yMin: 1, yMax: 10000 }
+        };
+    }
+
+    const scoreStep = CONFIG.views.score.stepSize;
     const rawMinScore = Math.min(...scores);
     const rawMaxScore = Math.max(...scores);
+    const scorePadding = Math.max(scoreStep * 0.2, (rawMaxScore - rawMinScore) * 0.08);
 
-    const globalScoreMin = Math.floor(rawMinScore / 2500) * 2500;
-    const globalScoreMax = Math.ceil((Math.max(rawMaxScore, 40000) + 500) / 2500) * 2500;
+    const scoreMin = Math.floor((rawMinScore - scorePadding) / scoreStep) * scoreStep;
+    const scoreMax = Math.ceil((rawMaxScore + scorePadding) / scoreStep) * scoreStep;
 
-    const ranks = fullData.map(d => d.rank).filter(r => r > 0);
-    const globalRankMin = 0;
+    const rankStep = CONFIG.views.rank.stepSize;
     const rawMaxRank = Math.max(...ranks);
-    const globalRankMax = Math.ceil(rawMaxRank / 500) * 500;
+    const rawMinRank = Math.min(...ranks);
+    const rankPadding = Math.max(rankStep * 0.2, (rawMaxRank - rawMinRank) * 0.08);
+    const rankMin = Math.max(1, Math.floor((rawMinRank - rankPadding) / rankStep) * rankStep);
+    const rankMax = Math.ceil((rawMaxRank + rankPadding) / rankStep) * rankStep;
 
     return {
         score: {
-            yMin: globalScoreMin,
-            yMax: globalScoreMax
+            yMin: scoreMin,
+            yMax: scoreMax
         },
         rank: {
-            yMin: globalRankMin,
-            yMax: globalRankMax
+            yMin: rankMin,
+            yMax: rankMax
         }
     };
 }
@@ -335,21 +353,24 @@ function syncPrevSeasonDataset() {
 
     if (!soloPlayer) {
         chartInstance.options = getChartOptions();
-        chartInstance.update();
+        chartInstance.resetZoom();
+        chartInstance.update('none');
         return;
     }
 
     const prevSeason = getPrevSeasonKey(currentSeason, soloPlayer);
     if (!prevSeason) {
         chartInstance.options = getChartOptions();
-        chartInstance.update();
+        chartInstance.resetZoom();
+        chartInstance.update('none');
         return;
     }
 
     const prevData = buildPlayerData(soloPlayer, prevSeason);
     if (!prevData.length) {
         chartInstance.options = getChartOptions();
-        chartInstance.update();
+        chartInstance.resetZoom();
+        chartInstance.update('none');
         return;
     }
 
@@ -359,7 +380,8 @@ function syncPrevSeasonDataset() {
     chartInstance.data.datasets.push(createDataset(soloPlayer, prevData, color, true));
 
     chartInstance.options = getChartOptions(prevData);
-    chartInstance.update(); // Removed 'none'
+    chartInstance.resetZoom();
+    chartInstance.update('none');
 }
 
 // ============ Chart Annotations ============
@@ -414,12 +436,29 @@ function getChartOptions(extraPoints = []) {
     return {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 150 },
+        animation: { duration: 0 },
         layout: {
             padding: { right: window.innerWidth < 600 ? 30 : 50 }
         },
         plugins: {
             annotation: { annotations: getAnnotations(currentView) },
+            zoom: {
+                limits: {
+                    y: {
+                        min: bounds[currentView].yMin,
+                        max: bounds[currentView].yMax,
+                        minRange: viewCfg.stepSize * 2
+                    }
+                },
+                pan: { enabled: true, mode: 'y' },
+                zoom: {
+                    wheel: { enabled: true },
+                    pinch: { enabled: true },
+                    mode: 'y',
+                    onZoomComplete: ({ chart }) => chart.update('none')
+                },
+                onPanComplete: ({ chart }) => chart.update('none')
+            },
             legend: {
                 position: 'top',
                 align: 'center',
@@ -543,7 +582,7 @@ function getChartOptions(extraPoints = []) {
                         if (currentView === 'rank' && value === 0) {
                             return 1;
                         }
-                        return value;
+                        return Math.round(value).toLocaleString();
                     }
                 },
                 afterFit: (axis) => { axis.width = window.innerWidth < 600 ? 70 : 80; }
@@ -593,6 +632,10 @@ function updateSeasonSelect(season) {
     currentSeason = season;
     soloPlayer = null;
     buildChartDataForSeason(season);
+}
+
+function resetChartZoom() {
+    if (chartInstance) chartInstance.resetZoom();
 }
 
 // ============ Initialize ============
