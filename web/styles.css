@@ -198,12 +198,18 @@ footer a {
 
     .view-buttons {
         margin-bottom: 0;
+        order: 1;
+    }
+
+    .controls select {
+        order: 2;
     }
 
     .controls > button {
         align-self: center;
         margin-top: 4px;
         width: 200px;
+        order: 3;
     }
 
     .last-updated {
