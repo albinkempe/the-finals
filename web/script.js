@@ -1,649 +1,529 @@
-// ============ Configuration ============
+/* HSD Ranked Intel: pure browser data model and canvas view. */
+
+// Keep the browser app configuration in one place so data paths and league
+// thresholds stay easy to update when the source files or ranking rules change.
 const CONFIG = {
-    csvUrl: 'data/rank_data.csv',
-    seasonsUrl: 'data/seasons.csv',
-    playerColors: ['#FA00FF', '#FF7B00', '#05FF00'],
-    views: {
-        score: {
-            label: 'Rank Score',
-            stepSize: 2500,
-            reverse: false
-        },
-        rank: {
-            label: 'Leaderboard Rank',
-            stepSize: 500,
-            reverse: true
-        }
-    },
-    chart: {
-        defaultColor: '#a0a0a0',
-        defaultBorderColor: '#1a4875',
-        gridColor: '#1a4875',
-        tooltipBg: '#080224',
-        tooltipBorder: '#15D1FF'
-    },
-    dataset: {
-        borderWidth: 2,
-        pointRadius: 1,
-        pointHoverRadius: 5,
-        pointHitRadius: 8
-    }
+  rankDataUrl: "../data/rank_data.csv",
+  seasonsUrl: "../data/seasons.csv",
+  colors: ["#ff2aa3", "#5d37e8", "#ff7138", "#1ca9df", "#69b92f"],
+  leagueScore: {
+    bronze: 0,
+    silver: 10000,
+    gold: 20000,
+    platinum: 30000,
+    diamond: 40000,
+    ruby: 50000,
+  },
+};
+const CHART_COLORS = { diamond: "#b996ff", ruby: "#ff5c83" };
+
+const state = {
+  records: [],
+  seasons: {},
+  currentSeason: "",
+  metric: "score",
+  selectedPlayer: "",
+  hiddenPlayers: new Set(),
+  colors: new Map(),
+};
+const $ = (selector) => document.querySelector(selector);
+const formatNumber = (value) =>
+  Number.isFinite(value) ? Math.round(value).toLocaleString() : "--";
+const formatDelta = (value, suffix = "") => {
+  if (!Number.isFinite(value) || value === 0) return "No change";
+  return `${value > 0 ? "+" : ""}${formatNumber(value)}${suffix}`;
+};
+const asNumber = (value) => {
+  const number = Number(
+    String(value ?? "")
+      .replace(/,/g, "")
+      .trim(),
+  );
+  return Number.isFinite(number) ? number : null;
 };
 
-// ============ State ============
-let chartInstance = null;
-let chartData = { labels: [], datasets: [] };
-let currentView = 'score';
-let fullData = [];
-let currentSeason = null;
-let soloPlayer = null; // steamName of the currently isolated player, or null
-let seasonsMap = {}; // e.g. { S9: { startDate: '2025-12-10', endDate: '2026-03-18' } }
-
-// ============ Utilities ============
-const getDayInSeason = (timestamp, season) => {
-    const info = seasonsMap[season ? season.toUpperCase() : ''];
-    if (!info) return timestamp.split(' ')[0];
-    const start = new Date(info.startDate);
-    const date = new Date(timestamp.split(' ')[0]);
-    return Math.floor((date - start) / 86400000);
-};
-
-const getDateKey = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
-
-const formatUpdatedAt = (timestamp) => {
-    const updatedAt = new Date(timestamp.replace(' ', 'T'));
-    if (Number.isNaN(updatedAt.getTime())) return '';
-
-    const today = new Date();
-    const updatedDate = getDateKey(updatedAt);
-    const todayDate = getDateKey(today);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayDate = getDateKey(yesterday);
-    const time = updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-
-    if (updatedDate === todayDate) return `Updated @ ${time}`;
-    if (updatedDate === yesterdayDate) return `Updated yesterday @ ${time}`;
-    return `Updated ${updatedDate} @ ${time}`;
-};
-
-function updateLastUpdated(data) {
-    const lastUpdated = document.getElementById('lastUpdated');
-    if (!lastUpdated || data.length === 0) return;
-
-    const latestTimestamp = data.reduce((latest, row) => {
-        return !latest || new Date(row.recordedAt) > new Date(latest) ? row.recordedAt : latest;
-    }, null);
-    lastUpdated.textContent = formatUpdatedAt(latestTimestamp);
+function parseCsv(text) {
+  // The data files are small and served as static assets, so a focused parser
+  // keeps the app dependency-free while still handling quoted CSV cells.
+  const rows = [];
+  let row = [],
+    cell = "",
+    quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === '"' && text[index + 1] === '"' && quoted) {
+      cell += '"';
+      index += 1;
+    } else if (character === '"') quoted = !quoted;
+    else if (character === "," && !quoted) {
+      row.push(cell.trim());
+      cell = "";
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(cell.trim());
+      cell = "";
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+    } else cell += character;
+  }
+  if (cell || row.length) {
+    row.push(cell.trim());
+    rows.push(row);
+  }
+  if (!rows.length) return [];
+  const headers = rows
+    .shift()
+    .map((header) => header.replace(/^\uFEFF/, "").trim());
+  return rows.map((values) =>
+    headers.reduce(
+      (record, header, index) => ({ ...record, [header]: values[index] ?? "" }),
+      {},
+    ),
+  );
 }
 
-// Returns the nearest previous season key that has ranked data for the player, or null.
-const getPrevSeasonKey = (season, playerName) => {
-    const sorted = Object.keys(seasonsMap).sort((a, b) => {
-        return parseInt(a.replace(/\D/g, ''), 10) - parseInt(b.replace(/\D/g, ''), 10);
+function normalizeRecord(row) {
+  const player = String(row.steamName || row.player || row.name || "").trim();
+  const season = String(row.season || "")
+    .trim()
+    .toUpperCase();
+  const recordedAt = String(row.recordedAt || row.date || "").trim();
+  if (!player || !season || !recordedAt) return null;
+  return {
+    player,
+    season,
+    recordedAt,
+    date: recordedAt.split(/[ T]/)[0],
+    score: asNumber(row.rankScore ?? row.score),
+    rank: asNumber(row.rank),
+    league: String(row.league || "").trim() || "Unranked",
+  };
+}
+
+async function loadData() {
+  // Load both files together; rank data is required, while season metadata is
+  // optional because the chart can still work from the records alone.
+  try {
+    const [rankResponse, seasonResponse] = await Promise.all([
+      fetch(CONFIG.rankDataUrl),
+      fetch(CONFIG.seasonsUrl),
+    ]);
+    if (!rankResponse.ok)
+      throw new Error(`Rank data returned ${rankResponse.status}`);
+    const [rankText, seasonText] = await Promise.all([
+      rankResponse.text(),
+      seasonResponse.ok ? seasonResponse.text() : Promise.resolve(""),
+    ]);
+    state.records = parseCsv(rankText)
+      .map(normalizeRecord)
+      .filter(Boolean)
+      .sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt));
+    parseCsv(seasonText).forEach((row) => {
+      if (row.season)
+        state.seasons[String(row.season).toUpperCase()] = {
+          start: row.startDate,
+          end: row.endDate,
+        };
     });
-    const idx = sorted.indexOf(season.toUpperCase());
-    if (idx <= 0) return null;
-    for (let i = idx - 1; i >= 0; i--) {
-        const candidate = sorted[i];
-        const hasData = fullData.some(
-            item => item.season === candidate && item.steamName === playerName
+    if (!state.records.length)
+      throw new Error("The rank CSV contains no usable records.");
+    state.currentSeason = [
+      ...new Set(state.records.map((record) => record.season)),
+    ].at(-1);
+    setStatus(`Tracking ${state.records.length} snapshots`);
+    populateSeasonSelect();
+    render();
+  } catch (error) {
+    console.error(error);
+    setStatus("Data connection failed", true);
+    $("#errorPanel").hidden = false;
+    $("#errorMessage").textContent =
+      `${error.message} Check data/rank_data.csv and reload.`;
+    $("#chartEmpty").hidden = false;
+  }
+}
+
+function setStatus(message, isError = false) {
+  $("#dataStatus").textContent = message;
+  $(".status-dot").style.background = isError ? "#ff2aa3" : "#c8ff32";
+}
+function populateSeasonSelect() {
+  const select = $("#seasonSelect");
+  select.innerHTML = [...new Set(state.records.map((record) => record.season))]
+    .map((season) => `<option value="${season}">${season}</option>`)
+    .join("");
+  select.value = state.currentSeason;
+  select.onchange = (event) => {
+    state.currentSeason = event.target.value;
+    state.selectedPlayer = "";
+    state.hiddenPlayers.clear();
+    render();
+  };
+}
+function recordsForSeason(season) {
+  return state.records.filter((record) => record.season === season);
+}
+function playerRecords(player, season) {
+  return recordsForSeason(season).filter((record) => record.player === player);
+}
+function latestByPlayer(records) {
+  return [...records]
+    .sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt))
+    .reduce((result, record) => {
+      result.set(record.player, record);
+      return result;
+    }, new Map());
+}
+function previousSeason(season, player) {
+  const seasons = [...new Set(state.records.map((record) => record.season))];
+  const index = seasons.indexOf(season);
+  return (
+    seasons
+      .slice(0, index)
+      .reverse()
+      .find((candidate) => playerRecords(player, candidate).length) || ""
+  );
+}
+function colorFor(player, index = 0) {
+  if (!state.colors.has(player))
+    state.colors.set(player, CONFIG.colors[index % CONFIG.colors.length]);
+  return state.colors.get(player);
+}
+
+function render() {
+  const seasonRecords = recordsForSeason(state.currentSeason);
+  const latest = latestByPlayer(seasonRecords);
+  const players = [...latest.keys()].sort(
+    (firstPlayer, secondPlayer) =>
+      (latest.get(firstPlayer).rank ?? Infinity) -
+      (latest.get(secondPlayer).rank ?? Infinity),
+  );
+  players.forEach((player, index) => colorFor(player, index));
+  renderStats(seasonRecords, latest);
+  renderCards(players, latest);
+  renderChart(players);
+  renderComparison();
+  const newest = state.records.at(-1)?.recordedAt;
+  $("#lastUpdated").textContent = newest
+    ? `Last update: ${new Date(newest.replace(" ", "T")).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`
+    : "Last update: --";
+}
+
+function renderStats(records, latest) {
+  // Stats use the first and latest snapshot for each player in the selected
+  // season, keeping the cards aligned with the chart's current season.
+  const best = [...latest.values()]
+    .filter((record) => Number.isFinite(record.rank))
+    .sort((a, b) => a.rank - b.rank)[0];
+  const topScore = [...latest.values()]
+    .filter((record) => Number.isFinite(record.score))
+    .sort((a, b) => b.score - a.score)[0];
+  const first = new Map();
+  records.forEach((record) => {
+    if (!first.has(record.player)) first.set(record.player, record);
+  });
+  const climbs = [...latest]
+    .map(([player, record]) => ({
+      player,
+      climb: record.score - (first.get(player)?.score ?? record.score),
+    }))
+    .filter(({ climb }) => Number.isFinite(climb))
+    .sort((a, b) => b.climb - a.climb);
+  const scoreMomentum = climbs.reduce((sum, { climb }) => sum + climb, 0);
+  const largestClimb = climbs[0];
+  $("#bestRank").textContent = best ? `#${formatNumber(best.rank)}` : "--";
+  $("#bestRankSub").textContent = best?.player || "Waiting for data";
+  $("#highestScore").textContent = formatNumber(topScore?.score);
+  $("#highestScoreSub").textContent = topScore?.player || "Waiting for data";
+  $("#momentum").textContent = formatDelta(scoreMomentum);
+  $("#momentumSub").textContent =
+    scoreMomentum >= 0 ? "Score gained this season" : "Score lost this season";
+  $("#snapshotCount").textContent = largestClimb
+    ? formatDelta(largestClimb.climb)
+    : "--";
+  $("#snapshotSub").textContent = largestClimb?.player || "Waiting for data";
+}
+
+function renderCards(players, latest) {
+  $("#playerCards").innerHTML =
+    players
+      .map((player, index) => {
+        const current = latest.get(player);
+        const history = playerRecords(player, state.currentSeason);
+        const previous = history.at(-2);
+        const scoreDelta = current.score - previous?.score;
+        const rankDelta = previous?.rank - current.rank;
+        const playerColor = colorFor(player, index);
+        const scoreProgress =
+          current.score && CONFIG.leagueScore.diamond
+            ? Math.min(
+                100,
+                Math.max(5, (current.score / CONFIG.leagueScore.diamond) * 100),
+              )
+            : 8;
+        return `<article class="player-card ${state.selectedPlayer === player ? "is-selected" : ""}" data-player="${encodeURIComponent(player)}" style="border-color:${playerColor}"><div class="player-name"><span>${player}</span><span class="player-rank">${current.rank ? `#${formatNumber(current.rank)}` : "Unranked"}<small class="player-diff" style="color:${playerColor}">${formatDelta(rankDelta)}</small></span></div><div class="player-meta"><span>${current.league}</span><span class="player-score">${formatNumber(current.score)} score <small class="player-diff" style="color:${playerColor}">${formatDelta(scoreDelta)}</small></span></div><div class="progress"><span style="width:${scoreProgress}%;background:${playerColor}"></span></div></article>`;
+      })
+      .join("") || '<p class="muted-text">No players found.</p>';
+  document.querySelectorAll(".player-card").forEach((card) => {
+    card.onclick = () => {
+      state.selectedPlayer = decodeURIComponent(card.dataset.player);
+      render();
+    };
+  });
+}
+
+function renderComparison() {
+  const player = state.selectedPlayer;
+  if (!player) {
+    $("#comparisonNote").textContent =
+      "Select a player to compare their seasons.";
+    $("#comparisonGrid").innerHTML =
+      '<p class="muted-text">Player history appears here when selected.</p>';
+    return;
+  }
+  const current = state.currentSeason;
+  const previous = previousSeason(current, player);
+  const currentLast = playerRecords(player, current).at(-1);
+  const previousLast = previous ? playerRecords(player, previous).at(-1) : null;
+  $("#comparisonNote").textContent =
+    `${player} · ${current}${previous ? ` versus ${previous}` : ""}`;
+  const scoreChange = currentLast?.score - previousLast?.score;
+  const rankChange = previousLast?.rank - currentLast?.rank;
+  $("#comparisonGrid").innerHTML =
+    `<div class="comparison-item"><h3>${current} / latest</h3><div class="comparison-stats"><div><span>Rank</span><strong>${currentLast?.rank ? `#${formatNumber(currentLast.rank)}` : "--"}</strong></div><div><span>Score</span><strong>${formatNumber(currentLast?.score)}</strong></div><div><span>League</span><strong>${currentLast?.league || "--"}</strong></div><div><span>Snapshots</span><strong>${playerRecords(player, current).length}</strong></div></div></div>${previousLast ? `<div class="comparison-item"><h3>${previous} / latest</h3><div class="comparison-stats"><div><span>Rank</span><strong>#${formatNumber(previousLast.rank)}</strong></div><div><span>Score</span><strong>${formatNumber(previousLast.score)}</strong></div><div><span>Rank change</span><strong class="${rankChange >= 0 ? "delta-up" : "delta-down"}">${formatDelta(rankChange)}</strong></div><div><span>Score change</span><strong class="${scoreChange >= 0 ? "delta-up" : "delta-down"}">${formatDelta(scoreChange)}</strong></div></div></div>` : '<div class="comparison-item"><h3>Earlier seasons</h3><p class="muted-text">No earlier season snapshot found for this player.</p></div>'}`;
+}
+
+function renderChart(players) {
+  const canvas = $("#rankChart");
+  const empty = $("#chartEmpty");
+  const context = canvas.getContext("2d");
+  const bounds = canvas.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, bounds.width * ratio);
+  canvas.height = Math.max(1, bounds.height * ratio);
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const width = bounds.width;
+  const height = bounds.height;
+  context.clearRect(0, 0, width, height);
+  const visible = players.filter((player) => !state.hiddenPlayers.has(player));
+  const allRecords = recordsForSeason(state.currentSeason);
+  const values = allRecords
+    .map((record) => record[state.metric])
+    .filter(Number.isFinite);
+  if (!values.length) {
+    empty.hidden = false;
+    $("#chartLegend").innerHTML = "";
+    return;
+  }
+  empty.hidden = true;
+  // Use fixed, meaningful increments so score and rank charts remain readable
+  // when switching seasons with very different value ranges.
+  const left = state.metric === "rank" ? 58 : 66;
+  const top = 18;
+  const right = 18;
+  const bottom = 34;
+  const chartWidth = width - left - right;
+  const chartHeight = height - top - bottom;
+  const step = state.metric === "rank" ? 500 : 2500;
+  const min =
+    state.metric === "rank" ? 1 : Math.floor(Math.min(...values) / step) * step;
+  const max =
+    state.metric === "rank"
+      ? Math.max(750, Math.ceil(Math.max(...values) / step) * step)
+      : Math.max(40000 + step, Math.ceil(Math.max(...values) / step) * step);
+  const range = max - min || 1;
+  const points = allRecords
+    .filter((record) => Number.isFinite(record[state.metric]))
+    .map((record) => ({
+      ...record,
+      timestamp: new Date(record.recordedAt.replace(" ", "T")).getTime(),
+    }))
+    .filter((record) => Number.isFinite(record.timestamp))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const startTime = points[0].timestamp;
+  const endTime = points.at(-1).timestamp;
+  const timeRange = endTime - startTime || 1;
+  const xFor = (record) =>
+    left + (chartWidth * (record.timestamp - startTime)) / timeRange;
+  context.font = "11px Space Grotesk";
+  context.strokeStyle = "#e2e0da";
+  context.fillStyle = "#898691";
+  context.lineWidth = 1;
+  const valueToY = (value) =>
+    top +
+    chartHeight *
+      (state.metric === "rank" ? (value - min) / range : (max - value) / range);
+  // League shading is drawn before grid lines and player paths. Diamond is
+  // above 40,000; Ruby is above rank 500 because rank 1 is at the top.
+  const bandTop =
+    state.metric === "rank" ? top : valueToY(CONFIG.leagueScore.diamond);
+  context.fillStyle = "#ffffff";
+  context.fillRect(left, top, chartWidth, chartHeight);
+  context.fillStyle =
+    state.metric === "rank"
+      ? `${CHART_COLORS.ruby}18`
+      : `${CHART_COLORS.diamond}22`;
+  context.fillRect(
+    left,
+    top,
+    chartWidth,
+    state.metric === "rank" ? valueToY(500) - top : Math.max(0, bandTop - top),
+  );
+  const ticks =
+    state.metric === "rank"
+      ? [
+          1,
+          ...Array.from(
+            { length: Math.floor((max - 1) / step) },
+            (_, index) => (index + 1) * step,
+          ),
+        ]
+      : Array.from(
+          { length: Math.floor((max - min) / step) + 1 },
+          (_, index) => min + index * step,
         );
-        if (hasData) return candidate;
-    }
-    return null;
-};
-
-const createDataset = (player, data, color, isPrevSeason = false) => ({
-    label: isPrevSeason ? `${player} (prev)` : player,
-    data,
-    borderColor: isPrevSeason ? color + '60' : color,
-    backgroundColor: 'transparent',
-    pointBackgroundColor: isPrevSeason ? color + '60' : color,
-    pointBorderColor: isPrevSeason ? color + '60' : color,
-    borderWidth: isPrevSeason ? 1.5 : CONFIG.dataset.borderWidth,
-    borderDash: isPrevSeason ? [1, 1] : [],
-    pointRadius: window.innerWidth < 600 ? 0 : CONFIG.dataset.pointRadius,
-    pointHoverRadius: isPrevSeason ? 3 : CONFIG.dataset.pointHoverRadius,
-    pointHitRadius: isPrevSeason ? 4 : CONFIG.dataset.pointHitRadius,
-    fill: false,
-    pointStyle: 'circle',
-    tension: window.innerWidth < 600 ? 0.2 : 0,
-    isPrevSeason,
-    parsing: { yAxisKey: currentView },
-    order: 1
-});
-
-// ============ Delta Label Plugin ============
-const deltaLabelPlugin = {
-    id: 'deltaLabel',
-    afterDatasetsDraw(chart) {
-        const { ctx, scales: { x, y } } = chart;
-        const yKey = currentView;
-
-        chart.data.datasets.forEach((dataset, i) => {
-            if (!chart.isDatasetVisible(i)) return;
-            if (dataset.isPrevSeason) return; // skip prev-season lines
-
-            const points = dataset.data;
-            if (!points || points.length < 2) return;
-
-            const last = points[points.length - 1];
-            const prev = points[points.length - 2];
-
-            const lastVal = last[yKey];
-            const prevVal = prev[yKey];
-            if (lastVal == null || prevVal == null) return;
-
-            const delta = lastVal - prevVal;
-            if (delta === 0) return;
-
-            const displayDelta = yKey === 'rank' ? -delta : delta;
-            const sign = displayDelta > 0 ? '+' : '';
-            const label = `${sign}${displayDelta.toLocaleString()}`;
-
-            const xPx = x.getPixelForValue(last.x) + 8;
-            const yPx = y.getPixelForValue(lastVal);
-
-            ctx.save();
-            ctx.font = `bold ${window.innerWidth < 600 ? '9px' : '11px'} "Segoe UI", Roboto, Arial, sans-serif`;
-            ctx.textBaseline = 'middle';
-            ctx.textAlign = 'left';
-
-            const isImprovement = displayDelta > 0;
-            ctx.fillStyle = isImprovement ? '#0084FF' : '#FF4315';
-
-            ctx.fillText(label, xPx, yPx);
-            ctx.restore();
-        });
-    }
-};
-
-// ============ Loading Indicator ============
-function showLoading(visible) {
-    let indicator = document.getElementById('loadingIndicator');
-    if (!indicator) return;
-    indicator.style.display = visible ? 'flex' : 'none';
-}
-
-// ============ Data Processing ============
-async function fetchData() {
-    showLoading(true);
-    try {
-        const [rankResponse, seasonsResponse] = await Promise.all([
-            fetch(CONFIG.csvUrl),
-            fetch(CONFIG.seasonsUrl)
-        ]);
-        const [rankCsv, seasonsCsv] = await Promise.all([
-            rankResponse.text(),
-            seasonsResponse.text()
-        ]);
-
-        Papa.parse(seasonsCsv, {
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-                results.data.forEach(row => {
-                    if (row.season) {
-                        seasonsMap[row.season.toUpperCase()] = {
-                            startDate: row.startDate,
-                            endDate: row.endDate
-                        };
-                    }
-                });
-            }
-        });
-
-        Papa.parse(rankCsv, {
-            header: true,
-            dynamicTyping: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-                processData(results.data);
-                showLoading(false);
-            }
-        });
-    } catch (error) {
-        console.error("Error loading CSV:", error);
-        showLoading(false);
-    }
-}
-
-function processData(data) {
-    if (!data || !Array.isArray(data)) return;
-
-    const cleanData = data
-        .filter(row => row.recordedAt && row.steamName)
-        .sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt));
-
-    updateLastUpdated(cleanData);
-
-    fullData = cleanData.map(item => ({
-        ...item,
-        season: item.season ? String(item.season).toUpperCase() : item.season
+  ticks.forEach((value) => {
+    const y = valueToY(value);
+    context.strokeStyle = "#e2e0da";
+    context.fillStyle = "#898691";
+    context.beginPath();
+    context.moveTo(left, y);
+    context.lineTo(width - right, y);
+    context.stroke();
+    context.fillText(formatNumber(value), 3, y + 4);
+  });
+  const labelIndexes =
+    points.length <= 7
+      ? points.map((_, index) => index)
+      : [
+          0,
+          ...Array.from({ length: 5 }, (_, index) =>
+            Math.round(((index + 1) * (points.length - 1)) / 6),
+          ),
+          points.length - 1,
+        ];
+  [...new Set(labelIndexes)].forEach((index) => {
+    const point = points[index];
+    const label = new Date(point.timestamp).toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+    });
+    context.fillText(label, xFor(point) - 16, height - 8);
+  });
+  visible.forEach((player) => {
+    const records = playerRecords(player, state.currentSeason)
+      .filter((record) => Number.isFinite(record[state.metric]))
+      .map((record) => ({
+        ...record,
+        timestamp: new Date(record.recordedAt.replace(" ", "T")).getTime(),
+      }))
+      .filter((record) => Number.isFinite(record.timestamp))
+      .sort((a, b) => a.timestamp - b.timestamp);
+    context.strokeStyle = colorFor(player);
+    context.lineWidth = state.selectedPlayer === player ? 3 : 2;
+    context.beginPath();
+    records.forEach((record, index) => {
+      const x = xFor(record);
+      const value = state.metric === "rank" ? record.rank : record.score;
+      const y = valueToY(value);
+      index ? context.lineTo(x, y) : context.moveTo(x, y);
+    });
+    context.stroke();
+  });
+  // Canvas has no native DOM points, so keep a parallel list of plotted points
+  // and use nearest-point hit testing for the HTML tooltip.
+  const hoverPoints = visible.flatMap((player) => {
+    const history = playerRecords(player, state.currentSeason)
+      .filter(
+        (record) =>
+          Number.isFinite(record.score) && Number.isFinite(record.rank),
+      )
+      .map((record) => ({
+        ...record,
+        timestamp: new Date(record.recordedAt.replace(" ", "T")).getTime(),
+      }))
+      .filter((record) => Number.isFinite(record.timestamp))
+      .map((record) => ({
+        record,
+        x: xFor(record),
+        y: valueToY(state.metric === "rank" ? record.rank : record.score),
+      }));
+    const pointsByTime = history.sort((a, b) => a.timestamp - b.timestamp);
+    return pointsByTime.map((point, index) => ({
+      ...point,
+      previous: pointsByTime[index - 1]?.record,
     }));
-
-    const seasons = [...new Set(fullData.map(item => item.season))].filter(s => s !== undefined && s !== null);
-    populateSeasonOptions(seasons);
-
-    currentSeason = seasons[seasons.length - 1];
-    buildChartDataForSeason(currentSeason);
-}
-
-function populateSeasonOptions(seasons) {
-    const select = document.getElementById('seasonSelect');
-    if (!select) return;
-    select.innerHTML = '';
-
-    seasons.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s;
-        opt.textContent = s;
-        select.appendChild(opt);
-    });
-
-    select.value = seasons[seasons.length - 1];
-    select.addEventListener('change', (e) => updateSeasonSelect(e.target.value));
-}
-
-// Build player data points for a given season, mapped onto that season's day axis
-function buildPlayerData(playerName, season) {
-    return fullData
-        .filter(item => item.season === season && item.steamName === playerName)
-        .map(item => ({
-            x: getDayInSeason(item.recordedAt, season),
-            score: item.rankScore,
-            rank: item.rank,
-            league: item.league,
-            season: item.season,
-            date: item.recordedAt.split(' ')[0]
-        }));
-}
-
-function getViewBounds(season = currentSeason, extraPoints = []) {
-    if (fullData.length === 0) {
-        return {
-            score: { yMin: 20000, yMax: 50000 },
-            rank: { yMin: 1, yMax: 10000 }
-        };
-    }
-
-    const seasonData = fullData.filter(item => item.season === season);
-    const chartPoints = [
-        ...seasonData,
-        ...extraPoints
-    ];
-    const scores = chartPoints
-        .map(d => d.rankScore ?? d.score)
-        .filter(Number.isFinite);
-    const ranks = chartPoints.map(d => d.rank).filter(rank => Number.isFinite(rank) && rank > 0);
-
-    if (scores.length === 0 || ranks.length === 0) {
-        return {
-            score: { yMin: 20000, yMax: 50000 },
-            rank: { yMin: 1, yMax: 10000 }
-        };
-    }
-
-    const scoreStep = CONFIG.views.score.stepSize;
-    const rawMinScore = Math.min(...scores);
-    const rawMaxScore = Math.max(...scores);
-    const scorePadding = Math.max(scoreStep * 0.2, (rawMaxScore - rawMinScore) * 0.08);
-
-    const scoreMin = Math.floor((rawMinScore - scorePadding) / scoreStep) * scoreStep;
-    const scoreMax = Math.ceil((rawMaxScore + scorePadding) / scoreStep) * scoreStep;
-
-    const rankStep = CONFIG.views.rank.stepSize;
-    const rawMaxRank = Math.max(...ranks);
-    const rawMinRank = Math.min(...ranks);
-    const rankPadding = Math.max(rankStep * 0.2, (rawMaxRank - rawMinRank) * 0.08);
-    const rankMin = Math.max(1, Math.floor((rawMinRank - rankPadding) / rankStep) * rankStep);
-    const rankMax = Math.ceil((rawMaxRank + rankPadding) / rankStep) * rankStep;
-
-    return {
-        score: {
-            yMin: scoreMin,
-            yMax: scoreMax
-        },
-        rank: {
-            yMin: rankMin,
-            yMax: rankMax
-        }
+  });
+  const tooltip = $("#chartTooltip");
+  canvas.onmousemove = (event) => {
+    const bounds = canvas.getBoundingClientRect();
+    const pointer = {
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
     };
-}
-
-function buildChartDataForSeason(season) {
-    soloPlayer = null; // reset isolation on season change
-    const filtered = fullData.filter(item => item.season === season);
-
-    const daySet = new Set(filtered.map(item => getDayInSeason(item.recordedAt, item.season)));
-    chartData.labels = [1, ...[...daySet].filter(d => d !== 1)].sort((a, b) => a - b);
-
-    const groupedByPlayer = filtered.reduce((acc, item) => {
-        const playerName = item.steamName;
-        if (!acc[playerName]) acc[playerName] = [];
-        acc[playerName].push({
-            x: getDayInSeason(item.recordedAt, item.season),
-            score: item.rankScore,
-            rank: item.rank,
-            league: item.league,
-            season: item.season,
-            date: item.recordedAt.split(' ')[0]
-        });
-        return acc;
-    }, {});
-
-    chartData.datasets = Object.entries(groupedByPlayer).map(([player, playerData], index) => {
-        const color = CONFIG.playerColors[index % CONFIG.playerColors.length];
-        return createDataset(player, playerData, color);
+    const nearest = hoverPoints.reduce((best, point) => {
+      const distance = Math.hypot(point.x - pointer.x, point.y - pointer.y);
+      return !best || distance < best.distance ? { ...point, distance } : best;
+    }, null);
+    if (!nearest || nearest.distance > 18) {
+      tooltip.hidden = true;
+      return;
+    }
+    const { record, previous } = nearest;
+    const playerColor = colorFor(record.player);
+    const snapshotDate = new Date(record.timestamp).toLocaleDateString([], {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
-
-    renderChart();
-}
-
-function syncPrevSeasonDataset() {
-    if (!chartInstance) return;
-
-    chartInstance.data.datasets = chartInstance.data.datasets.filter(ds => !ds.isPrevSeason);
-
-    if (!soloPlayer) {
-        chartInstance.options = getChartOptions();
-        chartInstance.resetZoom();
-        chartInstance.update('none');
-        return;
-    }
-
-    const prevSeason = getPrevSeasonKey(currentSeason, soloPlayer);
-    if (!prevSeason) {
-        chartInstance.options = getChartOptions();
-        chartInstance.resetZoom();
-        chartInstance.update('none');
-        return;
-    }
-
-    const prevData = buildPlayerData(soloPlayer, prevSeason);
-    if (!prevData.length) {
-        chartInstance.options = getChartOptions();
-        chartInstance.resetZoom();
-        chartInstance.update('none');
-        return;
-    }
-
-    const currentDs = chartInstance.data.datasets.find(ds => ds.label === soloPlayer);
-    const color = currentDs ? currentDs.borderColor : '#ffffff';
-
-    chartInstance.data.datasets.push(createDataset(soloPlayer, prevData, color, true));
-
-    chartInstance.options = getChartOptions(prevData);
-    chartInstance.resetZoom();
-    chartInstance.update('none');
-}
-
-// ============ Chart Annotations ============
-function getAnnotations(view) {
-    const annotations = {
-        score: {
-            diamondZone: {
-                type: 'box',
-                yScaleID: 'y',
-                yMin: (ctx) => 40000,
-                backgroundColor: 'rgba(0, 251, 255, 0.1)',
-                borderColor: 'transparent'
-            },
-            diamondLine: {
-                type: 'line',
-                yScaleID: 'y',
-                yMin: (ctx) => 40000,
-                yMax: (ctx) => 40000,
-                borderColor: 'rgba(0, 251, 255, 0.6)',
-                borderWidth: 3,
-                drawTime: 'beforeDatasetsDraw'
-            }
-        },
-        rank: {
-            top500Zone: {
-                type: 'box',
-                yScaleID: 'y',
-                yMin: (ctx) => 1,
-                yMax: (ctx) => 500,
-                backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                borderColor: 'transparent',
-                drawTime: 'beforeDatasetsDraw'
-            },
-            top500Line: {
-                type: 'line',
-                yScaleID: 'y',
-                yMin: (ctx) => 500,
-                yMax: (ctx) => 500,
-                borderColor: 'rgba(255, 0, 0, 0.6)',
-                borderWidth: 3
-            }
-        }
+    const scoreDelta = record.score - previous?.score;
+    const rankDelta = previous?.rank - record.rank;
+    tooltip.textContent = `${snapshotDate} | ${record.player} | Score ${formatNumber(record.score)} (${formatDelta(scoreDelta)}) | Rank #${formatNumber(record.rank)} (${formatDelta(rankDelta)})`;
+    tooltip.style.background = playerColor;
+    tooltip.style.boxShadow = `4px 4px 0 ${playerColor}`;
+    tooltip.hidden = false;
+    const tooltipWidth = tooltip.offsetWidth;
+    const tooltipHeight = tooltip.offsetHeight;
+    const halfWidth = tooltipWidth / 2;
+    tooltip.style.left = `${Math.min(Math.max(nearest.x, halfWidth + 6), width - halfWidth - 6)}px`;
+    tooltip.style.top = `${Math.min(Math.max(nearest.y - tooltipHeight - 10, 6), height - tooltipHeight - 6)}px`;
+  };
+  canvas.onmouseleave = () => {
+    tooltip.hidden = true;
+  };
+  $("#chartLegend").innerHTML = players
+    .map(
+      (player) =>
+        `<button class="legend-button ${state.hiddenPlayers.has(player) ? "is-muted" : ""}" data-player="${encodeURIComponent(player)}"><span class="legend-swatch" style="background:${colorFor(player)}"></span>${player}</button>`,
+    )
+    .join("");
+  document.querySelectorAll(".legend-button").forEach((button) => {
+    button.onclick = () => {
+      const player = decodeURIComponent(button.dataset.player);
+      state.hiddenPlayers.has(player)
+        ? state.hiddenPlayers.delete(player)
+        : state.hiddenPlayers.add(player);
+      renderChart(players);
     };
-    return annotations[view];
+  });
 }
 
-// ============ Chart Rendering ============
-function getChartOptions(extraPoints = []) {
-    const bounds = getViewBounds(currentSeason, extraPoints);
-    const viewCfg = CONFIG.views[currentView];
-
-    return {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 0 },
-        layout: {
-            padding: { right: window.innerWidth < 600 ? 30 : 50 }
-        },
-        plugins: {
-            annotation: { annotations: getAnnotations(currentView) },
-            zoom: {
-                limits: {
-                    y: {
-                        min: bounds[currentView].yMin,
-                        max: bounds[currentView].yMax,
-                        minRange: viewCfg.stepSize * 2
-                    }
-                },
-                pan: { enabled: true, mode: 'y' },
-                zoom: {
-                    wheel: { enabled: true },
-                    pinch: { enabled: true },
-                    mode: 'y',
-                    onZoomComplete: ({ chart }) => chart.update('none')
-                },
-                onPanComplete: ({ chart }) => chart.update('none')
-            },
-            legend: {
-                position: 'top',
-                align: 'center',
-                labels: {
-                    color: '#ffffff',
-                    font: { weight: 'bold' },
-                    usePointStyle: true,
-                    padding: 15,
-                    boxWidth: 6,
-                    boxHeight: 6,
-                    generateLabels: (chart) => {
-                        // Only show non-prev-season datasets in the legend
-                        return chart.data.datasets
-                            .map((dataset, i) => ({ dataset, i }))
-                            .filter(({ dataset }) => !dataset.isPrevSeason)
-                            .map(({ dataset, i }) => {
-                                const hidden = !chart.isDatasetVisible(i);
-                                const color = dataset.borderColor;
-                                return {
-                                    text: dataset.label,
-                                    fillStyle: hidden ? '#555' : color,
-                                    strokeStyle: hidden ? '#555' : color,
-                                    fontColor: hidden ? '#666' : '#ffffff',
-                                    hidden: false,
-                                    datasetIndex: i,
-                                    pointStyle: 'circle',
-                                    lineWidth: 0
-                                };
-                            });
-                    }
-                },
-                onClick: (e, legendItem, legend) => {
-                    const index = legendItem.datasetIndex;
-                    const ci = legend.chart;
-                    const clickedPlayer = ci.data.datasets[index]?.label;
-
-                    // Check if this player is already the only one visible (solo state)
-                    const onlyThisVisible = ci.data.datasets.every((ds, i) => {
-                        if (ds.isPrevSeason) return true; // ignore prev-season in check
-                        return i === index ? ci.isDatasetVisible(i) : !ci.isDatasetVisible(i);
-                    });
-
-                    if (onlyThisVisible) {
-                        // Clicking the solo player again → restore all
-                        soloPlayer = null;
-                        ci.data.datasets.forEach((ds, i) => {
-                            if (!ds.isPrevSeason) ci.show(i);
-                        });
-                    } else {
-                        // Solo this player
-                        soloPlayer = clickedPlayer;
-                        ci.data.datasets.forEach((ds, i) => {
-                            if (ds.isPrevSeason) return;
-                            i === index ? ci.show(i) : ci.hide(i);
-                        });
-                    }
-
-                    syncPrevSeasonDataset();
-                }
-            },
-            tooltip: {
-                backgroundColor: CONFIG.chart.tooltipBg,
-                titleColor: '#fff',
-                bodyColor: '#fff',
-                padding: 10,
-                borderColor: CONFIG.chart.tooltipBorder,
-                borderWidth: 1,
-                boxWidth: 6,
-                boxHeight: 6,
-                cornerRadius: 0,
-                usePointStyle: true,
-                displayColors: false,
-                callbacks: {
-                    title: (items) => {
-                        const day = items[0]?.label;
-                        return `Day ${day}`;
-                    },
-                    label: (context) => {
-                        const { score, rank, league, season, date } = context.raw;
-                        const lines = [
-                            `Player: ${context.dataset.label}`,
-                            `Season: ${season}`,
-                            `Date: ${date}`,
-                            `Score: ${score ? score.toLocaleString() : 'N/A'}`,
-                            `League: ${league}`
-                        ];
-                        if (rank != null) lines.splice(4, 0, `Rank: ${rank.toLocaleString()}`);
-                        return lines;
-                    }
-                }
-            }
-        },
-        scales: {
-            x: {
-                type: 'linear',
-                offset: true,
-                grid: { display: false },
-                min: 1,
-                title: {
-                    display: false,
-                    text: `Day of ${currentSeason}`,
-                    color: '#fff'
-                },
-                ticks: {
-                    maxTicksLimit: 10,
-                    precision: 0,
-                    callback: (val) => `Day ${val}`
-                }
-            },
-            y: {
-                reverse: viewCfg.reverse,
-                title: { display: true, text: CONFIG.views[currentView].label, color: '#fff' },
-                grid: { color: CONFIG.chart.gridColor },
-                min: bounds[currentView].yMin,
-                max: bounds[currentView].yMax,
-                suggestedMax: bounds[currentView].yMax,
-                ticks: {
-                    stepSize: CONFIG.views[currentView].stepSize,
-                    precision: 0,
-                    callback: function(value) {
-                        if (currentView === 'rank' && value === 0) {
-                            return 1;
-                        }
-                        return Math.round(value).toLocaleString();
-                    }
-                },
-                afterFit: (axis) => { axis.width = window.innerWidth < 600 ? 70 : 80; }
-            }
-        }
-    };
-}
-
-function renderChart() {
-    const ctx = document.getElementById('rankChart').getContext('2d');
-    Chart.defaults.color = CONFIG.chart.defaultColor;
-    Chart.defaults.borderColor = CONFIG.chart.defaultBorderColor;
-
-    if (chartInstance) {
-        chartInstance.destroy();
-        chartInstance = null;
-    }
-
-    chartInstance = new Chart(ctx, {
-        type: 'line',
-        data: { labels: chartData.labels, datasets: chartData.datasets },
-        options: getChartOptions(),
-        plugins: [deltaLabelPlugin]
-    });
-}
-
-// ============ View Management ============
-function updateView(view) {
-    currentView = view;
-
-    // Update button UI states
-    document.getElementById('btnScore').classList.toggle('active', view === 'score');
-    document.getElementById('btnRank').classList.toggle('active', view === 'rank');
-
-    if (!chartInstance) return;
-
-    chartInstance.options = getChartOptions(); 
-
-    chartInstance.data.datasets.forEach(dataset => {
-        dataset.parsing.yAxisKey = view;
-    });
-
-    chartInstance.update();
-}
-
-function updateSeasonSelect(season) {
-    currentSeason = season;
-    soloPlayer = null;
-    buildChartDataForSeason(season);
-}
-
-function resetChartZoom() {
-    if (chartInstance) chartInstance.resetZoom();
-}
-
-// ============ Initialize ============
-fetchData();
-
-window.addEventListener('resize', () => {
-    if (chartInstance) {
-        chartInstance.options = getChartOptions();
-        chartInstance.update();
-    }
+// Metric buttons redraw the same data with a different y-axis scale.
+document.querySelectorAll(".metric-button").forEach((button) => {
+  button.onclick = () => {
+    state.metric = button.dataset.metric;
+    document
+      .querySelectorAll(".metric-button")
+      .forEach((item) => item.classList.toggle("is-active", item === button));
+    renderChart([
+      ...latestByPlayer(recordsForSeason(state.currentSeason)).keys(),
+    ]);
+  };
 });
+window.addEventListener("resize", () => {
+  if (state.records.length)
+    renderChart([
+      ...latestByPlayer(recordsForSeason(state.currentSeason)).keys(),
+    ]);
+});
+loadData();
