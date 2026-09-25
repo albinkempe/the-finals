@@ -1,10 +1,9 @@
-/* HSD Ranked Intel: pure browser data model and canvas view. */
+const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const basePath = isLocal ? "../" : "";
 
-// Keep the browser app configuration in one place so data paths and league
-// thresholds stay easy to update when the source files or ranking rules change.
 const CONFIG = {
-  rankDataUrl: "data/rank_data.csv",
-  seasonsUrl: "data/seasons.csv",
+  rankDataUrl: `${basePath}data/rank_data.csv`,
+  seasonsUrl: `${basePath}data/seasons.csv`,
   colors: ["#ff2aa3", "#5d37e8", "#ff7138", "#1ca9df", "#69b92f"],
   leagueScore: {
     bronze: 0,
