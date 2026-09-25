@@ -3,8 +3,8 @@
 // Keep the browser app configuration in one place so data paths and league
 // thresholds stay easy to update when the source files or ranking rules change.
 const CONFIG = {
-  rankDataUrl: "data/rank_data.csv",
-  seasonsUrl: "data/seasons.csv",
+  rankDataUrl: "../data/rank_data.csv",
+  seasonsUrl: "../data/seasons.csv",
   colors: ["#ff2aa3", "#5d37e8", "#ff7138", "#1ca9df", "#69b92f"],
   leagueScore: {
     bronze: 0,
@@ -212,7 +212,7 @@ function render() {
 function renderStats(records, latest) {
   // Stats use the first and latest snapshot for each player in the selected
   // season, keeping the cards aligned with the chart's current season.
-  const best = [...records]
+  const best = [...latest.values()]
     .filter((record) => Number.isFinite(record.rank))
     .sort((a, b) => a.rank - b.rank)[0];
   const topScore = [...records]
