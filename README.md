@@ -7,6 +7,10 @@ A leaderboard rank tracker for [The Finals](https://www.reachthefinals.com/), bu
 - Fetches rank data daily from the [The Finals leaderboard API](https://api.the-finals-leaderboard.com) via a scheduled PowerShell script
 - Appends results to a CSV and auto-commits to this repo
 - Displays rank history on an interactive chart — toggle between **Score View** and **Rank View**, and filter by season
+- Shows a **Current** panel and a **Season bests** panel beside the chart, with each player's score, division and leaderboard rank
+- Click a player to overlay all of their seasons, aligned by day of season
+- Tracks progress through the current season against its published end date
+- Dark mode by default, with a light/dark toggle
 
 ## Repo structure
 
