@@ -267,7 +267,9 @@ function renderCards(players, latest) {
       .join("") || '<p class="muted-text">No players found.</p>';
   document.querySelectorAll(".player-card").forEach((card) => {
     card.onclick = () => {
-      state.selectedPlayer = decodeURIComponent(card.dataset.player);
+      const clickedPlayer = decodeURIComponent(card.dataset.player);
+      state.selectedPlayer =
+        state.selectedPlayer === clickedPlayer ? "" : clickedPlayer;
       render();
     };
   });
