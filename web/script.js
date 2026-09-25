@@ -1,5 +1,4 @@
-// test
-
+// check if the page is being served from localhost or a local file, and adjust the base path for data files accordingly.
 const isLocal =
   window.location.hostname === "localhost" ||
   window.location.hostname === "127.0.0.1";
