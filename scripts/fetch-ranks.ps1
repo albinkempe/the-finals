@@ -38,12 +38,12 @@ for ($i = $StartSeason; $i -le ($StartSeason + 5); $i++) {
     try {
         $TestResponse = Invoke-RestMethod -Uri $TestUrl -Method Get
         if ($null -ne $TestResponse.data -and $TestResponse.data.Count -gt 0) {
-            $Season = $TestSeason   # This season has data, keep going to find the latest
+            $Season = $TestSeason
         } else {
-            break                   # No data means we've gone past the current season
+            break
         }
     } catch {
-        break                       # API error also means we've gone too far
+        break
     }
 }
 
