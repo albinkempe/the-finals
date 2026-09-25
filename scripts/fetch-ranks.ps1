@@ -86,11 +86,13 @@ if ($null -ne $FinalResults) {
         Push-Location $RepoRoot
 
         if (Test-Path ".git") {
+            git checkout main
+            git pull --rebase origin main
+
             $GitStatus = git status --porcelain
             if ($GitStatus) {
                 git add $OutputFile
-                $CommitMessage = "Update rank data: $TodayStr"
-                git commit -m $CommitMessage
+                git commit -m "Update rank data: $TodayStr"
                 git push
                 Write-Host "Changes pushed to repository successfully." -ForegroundColor Green
             } else {
