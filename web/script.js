@@ -212,10 +212,10 @@ function render() {
 function renderStats(records, latest) {
   // Stats use the first and latest snapshot for each player in the selected
   // season, keeping the cards aligned with the chart's current season.
-  const best = [...latest.values()]
+  const best = [...records]
     .filter((record) => Number.isFinite(record.rank))
     .sort((a, b) => a.rank - b.rank)[0];
-  const topScore = [...latest.values()]
+  const topScore = [...records]
     .filter((record) => Number.isFinite(record.score))
     .sort((a, b) => b.score - a.score)[0];
   const first = new Map();

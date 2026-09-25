@@ -1,29 +1,135 @@
 <!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Track The Finals ranked performance across seasons.">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Track The Finals ranked performance across seasons."
+    />
     <title>The Finals / HSD</title>
-    <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="styles.css">
-</head>
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
 
-<body>
+  <body>
     <header class="site-header">
-        <a class="brand" href="./" aria-label="HSD ranked performance home"><img src="the_finals_logo.png" alt="The Finals"><span>The Finals <b>/</b> HSD</span></a>
-        <div class="header-meta"><span class="status-dot" aria-hidden="true"></span><span id="dataStatus">Connecting to data</span></div>
+      <a class="brand" href="./" aria-label="HSD ranked performance home"
+        ><img src="the_finals_logo.png" alt="The Finals" /><span
+          >The Finals <b>/</b> HSD</span
+        ></a
+      >
+      <div class="header-meta">
+        <span class="status-dot" aria-hidden="true"></span
+        ><span id="dataStatus">Connecting to data</span>
+      </div>
     </header>
     <main class="app-shell">
-        <section class="hero-row"><div><p class="eyebrow">PLAYER PERFORMANCE</p><h1>Ranked Cashout</h1></div><div class="season-picker"><label for="seasonSelect">Season</label><select id="seasonSelect" aria-label="Tracking season"></select></div></section>
-        <section class="stat-grid" aria-label="Season overview"><article class="stat-card stat-card--lime"><span class="stat-label">Best current rank</span><strong id="bestRank">--</strong><span id="bestRankSub" class="stat-sub">Waiting for data</span></article><article class="stat-card stat-card--pink"><span class="stat-label">Highest score</span><strong id="highestScore">--</strong><span id="highestScoreSub" class="stat-sub">Waiting for data</span></article><article class="stat-card stat-card--orange"><span class="stat-label">Squad momentum</span><strong id="momentum">--</strong><span id="momentumSub" class="stat-sub">Change since first snapshot</span></article><article class="stat-card stat-card--blue"><span class="stat-label">Largest climb</span><strong id="snapshotCount">--</strong><span id="snapshotSub" class="stat-sub">Waiting for data</span></article></section>
-        <section class="content-grid"><article class="panel chart-panel"><div class="panel-heading"><div><p class="eyebrow">TRAJECTORY</p><h2>Season climb</h2></div><div class="segmented" role="group" aria-label="Metric to display"><button class="metric-button is-active" data-metric="score">Score</button><button class="metric-button" data-metric="rank">Rank</button></div></div><div class="chart-wrap"><canvas id="rankChart" role="img" aria-label="Player performance chart"></canvas><div id="chartTooltip" class="chart-tooltip" role="status" aria-live="polite" hidden></div><div id="chartEmpty" class="empty-state" hidden>No ranked snapshots found for this season.</div></div><div id="chartLegend" class="chart-legend" aria-label="Players"></div></article><aside class="panel insight-panel"><div class="panel-heading"><div><p class="eyebrow">SQUAD</p><h2>Players</h2></div><span class="live-label">LIVE DATA</span></div><div id="playerCards" class="player-cards"></div></aside></section>
-        <section class="panel comparison-panel"><div class="panel-heading"><div><p class="eyebrow">HISTORY</p><h2>Season comparison</h2></div><p id="comparisonNote" class="muted-text">Select a player to compare their seasons.</p></div><div id="comparisonGrid" class="comparison-grid"></div></section>
-        <section id="errorPanel" class="error-panel" hidden><strong>Data is unavailable</strong><p id="errorMessage">Place the daily CSV files in the configured data folder, then reload.</p></section>
+      <section class="hero-row">
+        <div>
+          <p class="eyebrow">PLAYER PERFORMANCE</p>
+          <h1>Ranked Cashout</h1>
+        </div>
+        <div class="season-picker">
+          <label for="seasonSelect">Season</label
+          ><select id="seasonSelect" aria-label="Tracking season"></select>
+        </div>
+      </section>
+      <section class="stat-grid" aria-label="Season overview">
+        <article class="stat-card stat-card--lime">
+          <span class="stat-label">Best rank</span
+          ><strong id="bestRank">--</strong
+          ><span id="bestRankSub" class="stat-sub">Waiting for data</span>
+        </article>
+        <article class="stat-card stat-card--pink">
+          <span class="stat-label">Highest score</span
+          ><strong id="highestScore">--</strong
+          ><span id="highestScoreSub" class="stat-sub">Waiting for data</span>
+        </article>
+        <article class="stat-card stat-card--orange">
+          <span class="stat-label">Squad momentum</span
+          ><strong id="momentum">--</strong
+          ><span id="momentumSub" class="stat-sub"
+            >Change since first snapshot</span
+          >
+        </article>
+        <article class="stat-card stat-card--blue">
+          <span class="stat-label">Largest climb</span
+          ><strong id="snapshotCount">--</strong
+          ><span id="snapshotSub" class="stat-sub">Waiting for data</span>
+        </article>
+      </section>
+      <section class="content-grid">
+        <article class="panel chart-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">TRAJECTORY</p>
+              <h2>Season climb</h2>
+            </div>
+            <div class="segmented" role="group" aria-label="Metric to display">
+              <button class="metric-button is-active" data-metric="score">
+                Score</button
+              ><button class="metric-button" data-metric="rank">Rank</button>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas
+              id="rankChart"
+              role="img"
+              aria-label="Player performance chart"
+            ></canvas>
+            <div
+              id="chartTooltip"
+              class="chart-tooltip"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></div>
+            <div id="chartEmpty" class="empty-state" hidden>
+              No ranked snapshots found for this season.
+            </div>
+          </div>
+          <div id="chartLegend" class="chart-legend" aria-label="Players"></div>
+        </article>
+        <aside class="panel insight-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">SQUAD</p>
+              <h2>Players</h2>
+            </div>
+            <span class="live-label">LIVE DATA</span>
+          </div>
+          <div id="playerCards" class="player-cards"></div>
+        </aside>
+      </section>
+      <section class="panel comparison-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">HISTORY</p>
+            <h2>Season comparison</h2>
+          </div>
+          <p id="comparisonNote" class="muted-text">
+            Select a player to compare their seasons.
+          </p>
+        </div>
+        <div id="comparisonGrid" class="comparison-grid"></div>
+      </section>
+      <section id="errorPanel" class="error-panel" hidden>
+        <strong>Data is unavailable</strong>
+        <p id="errorMessage">
+          Place the daily CSV files in the configured data folder, then reload.
+        </p>
+      </section>
     </main>
-    <footer><span>The Finals / HSD</span><span id="lastUpdated">Last update: --</span><a href="https://github.com/albinkempe/the-finals" target="_blank" rel="noopener noreferrer">Source on GitHub</a></footer>
+    <footer>
+      <span>The Finals / HSD</span><span id="lastUpdated">Last update: --</span
+      ><a
+        href="https://github.com/albinkempe/the-finals"
+        target="_blank"
+        rel="noopener noreferrer"
+        >Source on GitHub</a
+      >
+    </footer>
     <script src="script.js"></script>
-</body>
-
+  </body>
 </html>

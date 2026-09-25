@@ -38,6 +38,7 @@ the-finals/
    - Trigger: Daily at your preferred time
 
 The script will:
+
 - Auto-detect the current season
 - Skip if data has already been fetched today
 - Append new rows to `data/rank_data.csv`
