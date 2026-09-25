@@ -3,6 +3,19 @@ $Players    = @("Trumman#6019", "turbo#9840", "mike#2329")
 $RepoRoot   = "$HOME\Projects\the-finals"
 $OutputFile = "$RepoRoot\data\rank_data.csv"
 
+# --- Sync repo first, so we're reading/writing against the latest CSV ---
+Push-Location $RepoRoot
+if (Test-Path ".git") {
+    git checkout main
+    git pull --rebase origin main
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Pull failed — aborting." -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+}
+Pop-Location
+
 # --- Auto-detect current season by trying incrementally ---
 # Reads the last recorded season from the CSV as a starting point, then probes
 # s+1, s+2 etc. until the API stops returning data. Falls back to s1 if no CSV exists.
@@ -80,33 +93,25 @@ if ($null -ne $FinalResults) {
     Write-Host "`nSuccess! Data saved to $OutputFile" -ForegroundColor Green
     $FinalResults | Format-Table Name, Rank, League, RankScore -AutoSize
 
-    # --- Git: only commit if something actually changed ---
     Write-Host "`n--- Pushing to Git ---" -ForegroundColor Cyan
+    Push-Location $RepoRoot
     try {
-        Push-Location $RepoRoot
-
-        if (Test-Path ".git") {
-            git checkout main
-            git pull --rebase origin main
-
-            $GitStatus = git status --porcelain
-            if ($GitStatus) {
-                git add $OutputFile
-                git commit -m "Update rank data: $TodayStr"
-                git push
-                Write-Host "Changes pushed to repository successfully." -ForegroundColor Green
+        $GitStatus = git status --porcelain
+        if ($GitStatus) {
+            git add $OutputFile
+            git commit -m "Update rank data: $TodayStr"
+            git push
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Push failed — commit is local only, will retry next run." -ForegroundColor Red
             } else {
-                Write-Host "No changes to commit (data unchanged)." -ForegroundColor Yellow
+                Write-Host "Changes pushed to repository successfully." -ForegroundColor Green
             }
         } else {
-            Write-Host "Warning: $RepoRoot is not a Git repository." -ForegroundColor Yellow
+            Write-Host "No changes to commit (data unchanged)." -ForegroundColor Yellow
         }
-    } catch {
-        Write-Host "Git operation failed: $($_.Exception.Message)" -ForegroundColor Red
     } finally {
         Pop-Location
     }
-
 } else {
-    Write-Host "`nNo data was collected. Check your Player IDs or API URL." -ForegroundColor Red
+    Write-Host "`nNo data was collected." -ForegroundColor Red
 }
