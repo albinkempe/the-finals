@@ -1,119 +1,241 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Track The Finals ranked performance across seasons."
+      content="Track HSD ranked performance in The Finals across seasons."
     />
     <title>The Finals / HSD</title>
     <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Archivo carries a width axis, so the masthead and the body copy come
+         from one superfamily at two widths. Plex Mono sets every figure. -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    />
     <link rel="stylesheet" href="styles.css" />
+    <script>
+      // Stamp the theme before first paint so the page never flashes the wrong
+      // mode. Dark is the default; an explicit choice is remembered per browser.
+      try {
+        var stored = localStorage.getItem("hsd-theme");
+        document.documentElement.dataset.theme =
+          stored === "light" ? "light" : "dark";
+      } catch (error) {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
   </head>
 
   <body>
     <header class="site-header">
-      <a class="brand" href="./" aria-label="HSD ranked performance home"
-        ><img src="the_finals_logo.png" alt="The Finals" /><span
-          >The Finals <b>/</b> HSD</span
-        ></a
-      >
-      <div class="header-meta">
-        <span class="status-dot" aria-hidden="true"></span
-        ><span id="dataStatus">Connecting to data</span>
+      <div class="masthead">
+        <a class="brand" href="./" aria-label="HSD ranked performance home">
+          <img src="the_finals_logo.png" alt="" />
+          <span class="brand-text">
+            <span class="brand-name">The Finals <b>/</b> HSD</span>
+            <span class="brand-sub">Ranked ladder tracker</span>
+          </span>
+        </a>
+        <div class="header-right">
+          <p class="data-status">
+            <span class="status-dot" aria-hidden="true"></span
+            ><span id="dataStatus">Connecting to data</span>
+          </p>
+          <button
+            id="themeToggle"
+            class="theme-toggle"
+            type="button"
+            aria-label="Switch to light mode"
+          >
+            <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+              <circle
+                cx="12"
+                cy="12"
+                r="4.2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+              />
+              <path
+                d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
+
     <main class="app-shell">
-      <section class="hero-row">
-        <div>
-          <p class="eyebrow">PLAYER PERFORMANCE</p>
-          <h1>Ranked Cashout</h1>
+      <!-- One filter row, above everything it scopes: season and metric drive
+           the chart, the player cards and the table alike. -->
+      <section class="controls" aria-label="Filters">
+        <div class="control">
+          <label for="seasonSelect">Season</label>
+          <div class="select-shell">
+            <select id="seasonSelect"></select>
+            <svg class="select-chevron" viewBox="0 0 12 12" aria-hidden="true">
+              <path
+                d="M3 4.5 6 7.5 9 4.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
         </div>
-        <div class="season-picker">
-          <label for="seasonSelect">Season</label
-          ><select id="seasonSelect" aria-label="Tracking season"></select>
+        <div class="control">
+          <span class="control-label" id="metricLabel">View</span>
+          <div class="segmented" role="group" aria-labelledby="metricLabel">
+            <button
+              class="metric-button is-active"
+              data-metric="score"
+              type="button"
+              aria-pressed="true"
+            >
+              Score
+            </button>
+            <button
+              class="metric-button"
+              data-metric="rank"
+              type="button"
+              aria-pressed="false"
+            >
+              Rank
+            </button>
+          </div>
         </div>
-      </section>
-      <section class="stat-grid" aria-label="Season overview">
-        <article class="stat-card stat-card--lime">
-          <span class="stat-label">Best current rank</span
-          ><strong id="bestRank">--</strong
-          ><span id="bestRankSub" class="stat-sub">Waiting for data</span>
-        </article>
-        <article class="stat-card stat-card--pink">
-          <span class="stat-label">Highest score</span
-          ><strong id="highestScore">--</strong
-          ><span id="highestScoreSub" class="stat-sub">Waiting for data</span>
-        </article>
-        <article class="stat-card stat-card--orange">
-          <span class="stat-label">Squad momentum</span
-          ><strong id="momentum">--</strong
-          ><span id="momentumSub" class="stat-sub"
-            >Change since first snapshot</span
+        <!-- Seasons run to a published end date, so how far through one we are
+             is a fact worth showing, not a decoration. -->
+        <div class="season-run" id="seasonRun" hidden>
+          <div class="run-head">
+            <span class="run-day" id="runDay"></span>
+            <span class="run-end" id="runEnd"></span>
+          </div>
+          <div
+            class="run-track"
+            id="runTrack"
+            role="progressbar"
+            aria-label="Season progress"
+            aria-valuemin="0"
+            aria-valuemax="100"
           >
-        </article>
-        <article class="stat-card stat-card--blue">
-          <span class="stat-label">Largest climb</span
-          ><strong id="snapshotCount">--</strong
-          ><span id="snapshotSub" class="stat-sub">Waiting for data</span>
-        </article>
+            <span class="run-fill" id="runFill"></span>
+          </div>
+          <p class="run-note" id="seasonRange"></p>
+        </div>
       </section>
-      <section class="content-grid">
-        <article class="panel chart-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">TRAJECTORY</p>
-              <h2>Season climb</h2>
+
+      <div class="main-grid">
+        <section class="chart-card" aria-labelledby="chartTitle">
+          <div class="chart-head">
+            <div class="chart-title-block">
+              <p class="chart-eyebrow" id="chartEyebrow"></p>
+              <h1 id="chartTitle">Ranked cashout</h1>
+              <div class="chart-meta" id="chartMeta"></div>
             </div>
-            <div class="segmented" role="group" aria-label="Metric to display">
-              <button class="metric-button is-active" data-metric="score">
-                Score</button
-              ><button class="metric-button" data-metric="rank">Rank</button>
+            <div class="chart-head-right">
+              <button id="clearFocus" class="chart-back" type="button" hidden>
+                Back to squad
+              </button>
+              <div
+                id="chartLegend"
+                class="chart-legend"
+                role="group"
+                aria-label="Chart series"
+              ></div>
             </div>
           </div>
+
           <div class="chart-wrap">
-            <canvas
+            <svg
               id="rankChart"
+              class="chart-svg"
               role="img"
-              aria-label="Player performance chart"
-            ></canvas>
+              tabindex="0"
+              aria-describedby="chartTitle"
+            ></svg>
             <div
               id="chartTooltip"
               class="chart-tooltip"
               role="status"
-              aria-live="polite"
               hidden
             ></div>
-            <div id="chartEmpty" class="empty-state" hidden>
+            <p id="chartEmpty" class="empty-state" hidden>
               No ranked snapshots found for this season.
-            </div>
+            </p>
           </div>
-          <div id="chartLegend" class="chart-legend" aria-label="Players"></div>
-        </article>
-        <aside class="panel insight-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">SQUAD</p>
-              <h2>Players</h2>
+        </section>
+
+        <aside class="side-rail">
+          <section class="live-panel" aria-labelledby="liveTitle">
+            <div class="live-head">
+              <span class="live-badge">
+                <span class="live-dot" aria-hidden="true"></span>Live
+              </span>
+              <span class="live-season" id="liveSeason"></span>
             </div>
-            <span class="live-label">LIVE DATA</span>
-          </div>
-          <div id="playerCards" class="player-cards"></div>
+            <h2 class="live-title" id="liveTitle">Current</h2>
+            <p class="live-sub" id="liveStamp"></p>
+            <ol class="live-list" id="liveList"></ol>
+          </section>
+
+          <section class="bests-panel" aria-labelledby="bestsTitle">
+            <div class="bests-head">
+              <h2 id="bestsTitle">Season bests</h2>
+              <span class="bests-season" id="bestsSeason"></span>
+            </div>
+            <div class="bests-columns" aria-hidden="true">
+              <span></span><span>Best score</span>
+            </div>
+            <ol class="bests-list" id="bestsList"></ol>
+          </section>
         </aside>
-      </section>
-      <section class="panel comparison-panel">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">HISTORY</p>
-            <h2>Season comparison</h2>
-          </div>
-          <p id="comparisonNote" class="muted-text">
-            Select a player to compare their seasons.
-          </p>
+      </div>
+
+      <details class="table-panel">
+        <summary>
+          Table view<span class="summary-note"
+            >every snapshot in this season</span
+          >
+        </summary>
+        <div class="table-scroll">
+          <table id="dataTable" class="data-table">
+            <caption class="visually-hidden">
+              Every rank snapshot recorded in the selected season.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Player</th>
+                <th scope="col">League</th>
+                <th scope="col" class="numeric">Rank</th>
+                <th scope="col" class="numeric">Score</th>
+              </tr>
+            </thead>
+            <tbody id="dataTableBody"></tbody>
+          </table>
         </div>
-        <div id="comparisonGrid" class="comparison-grid"></div>
-      </section>
+      </details>
+
       <section id="errorPanel" class="error-panel" hidden>
         <strong>Data is unavailable</strong>
         <p id="errorMessage">
@@ -121,15 +243,18 @@
         </p>
       </section>
     </main>
-    <footer>
-      <span>The Finals / HSD</span><span id="lastUpdated">Last update: --</span
-      ><a
+
+    <footer class="site-footer">
+      <span class="footer-mark">The Finals <b>/</b> HSD</span>
+      <span id="lastUpdated">Last update: --</span>
+      <a
         href="https://github.com/albinkempe/the-finals"
         target="_blank"
         rel="noopener noreferrer"
         >Source on GitHub</a
       >
     </footer>
+
     <script src="script.js"></script>
   </body>
 </html>
