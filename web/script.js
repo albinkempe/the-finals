@@ -198,9 +198,7 @@ function parseCsv(text) {
     rows.push(row);
   }
   if (!rows.length) return [];
-  const headers = rows
-    .shift()
-    .map((header) => header.replace(/^﻿/, "").trim());
+  const headers = rows.shift().map((header) => header.replace(/^﻿/, "").trim());
   return rows.map((values) =>
     headers.reduce(
       (record, header, index) => ({ ...record, [header]: values[index] ?? "" }),
@@ -837,8 +835,7 @@ function renderChart() {
       : `${model.series.map((s) => s.label).join(", ")} in ${state.season}`;
   svg.setAttribute(
     "aria-label",
-    `${measure} for ${who}. ` +
-      "Full values are in the table view below.",
+    `${measure} for ${who}. ` + "Full values are in the table view below.",
   );
 
   state.plot = { model, buckets, xFor, yFor, pad, plotHeight, ink };
@@ -1171,9 +1168,7 @@ function renderLivePanel() {
     : "Waiting for data";
 
   const list = $("#liveList");
-  list.replaceChildren(
-    ...rows.map((row) => buildLiveRow(row.player)),
-  );
+  list.replaceChildren(...rows.map((row) => buildLiveRow(row.player)));
 }
 
 // Two lines per player: who scored what, then which division that score sits
@@ -1256,8 +1251,7 @@ function buildBestsRow(player) {
   row.type = "button";
   row.className = "bests-row";
   if (state.focused === player) row.classList.add("is-selected");
-  if (state.focused && state.focused !== player)
-    row.classList.add("is-dimmed");
+  if (state.focused && state.focused !== player) row.classList.add("is-dimmed");
   row.style.setProperty("--player-color", colorFor(player));
   row.setAttribute("aria-label", `Show every season for ${player}`);
 
