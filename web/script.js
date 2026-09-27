@@ -1229,9 +1229,14 @@ function buildLiveRow(player) {
    -------------------------------------------------------------------------- */
 function renderPlayerCards() {
   $("#bestsSeason").textContent = state.season;
-  const players = state.players.filter(
-    (player) => playerRecords(player).length,
-  );
+  // Highest season best first; a player with no scored snapshot sorts last.
+  const players = state.players
+    .filter((player) => playerRecords(player).length)
+    .sort((a, b) => {
+      const scoreA = seasonBests(a).bestScore?.score ?? -Infinity;
+      const scoreB = seasonBests(b).bestScore?.score ?? -Infinity;
+      return scoreB - scoreA || a.localeCompare(b);
+    });
   const list = $("#bestsList");
   if (!players.length) {
     const empty = document.createElement("li");
