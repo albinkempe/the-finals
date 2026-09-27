@@ -73,7 +73,8 @@
   --axis: #b7b4a9;
   --border: rgba(13, 12, 10, 0.12);
   --border-strong: rgba(13, 12, 10, 0.26);
-  --shadow: 0 1px 2px rgba(60, 54, 40, 0.06), 0 12px 30px rgba(60, 54, 40, 0.09);
+  --shadow:
+    0 1px 2px rgba(60, 54, 40, 0.06), 0 12px 30px rgba(60, 54, 40, 0.09);
   --accent: #d13a20;
   --accent-ink: #ffffff;
   --accent-soft: rgba(209, 58, 32, 0.12);
@@ -128,7 +129,12 @@ body {
   flex-direction: column;
   background: var(--page);
   color: var(--text-primary);
-  font-family: Archivo, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family:
+    Archivo,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
   font-size: 15px;
   font-optical-sizing: auto;
   line-height: 1.5;
@@ -198,11 +204,7 @@ h3 {
 /* --- masthead -------------------------------------------------------------- */
 .site-header {
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(
-    180deg,
-    var(--surface-lift) 0%,
-    var(--page) 100%
-  );
+  background: linear-gradient(180deg, var(--surface-lift) 0%, var(--page) 100%);
   /* The one place the identity colour runs edge to edge. */
   box-shadow: inset 0 3px 0 -1px var(--accent);
 }
