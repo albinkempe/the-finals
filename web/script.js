@@ -274,22 +274,15 @@ async function loadData() {
     ].sort((first, second) => seasonNumber(first) - seasonNumber(second));
     state.season = state.seasonList.at(-1);
 
-    setStatus(`${formatNumber(state.records.length)} snapshots tracked`);
     populateSeasonSelect();
     render();
   } catch (error) {
     console.error(error);
-    setStatus("Data connection failed", true);
     $("#errorPanel").hidden = false;
     $("#errorMessage").textContent =
       `${error.message} Check data/rank_data.csv and reload.`;
     $("#chartEmpty").hidden = false;
   }
-}
-
-function setStatus(message, isError = false) {
-  $("#dataStatus").textContent = message;
-  $(".status-dot").classList.toggle("is-error", isError);
 }
 
 function populateSeasonSelect() {
@@ -516,6 +509,10 @@ function renderChart() {
   $("#chartEmpty").hidden = true;
 
   const compact = width < 640;
+  // The end tags below are dropped on a narrow chart, so the legend carries
+  // each player's figure instead - and only then.
+  $("#chartLegend").classList.toggle("shows-values", compact);
+  placeSeasonRun(compact);
   const overlaid = model.mode === "player";
   const pad = {
     top: 18,
@@ -998,7 +995,7 @@ function hideTooltip() {
    -------------------------------------------------------------------------- */
 function render() {
   renderSeasonRun();
-  renderHeadings();
+  renderChartHead();
   renderLegend();
   renderChart();
   renderLivePanel();
@@ -1021,12 +1018,6 @@ function renderSeasonRun() {
   const run = $("#seasonRun");
   run.hidden = !records.length;
   if (!records.length) return;
-
-  const span = `${formatFullDay(records[0].timestamp)} – ${formatFullDay(
-    records.at(-1).timestamp,
-  )}`;
-  $("#seasonRange").textContent =
-    `Tracked ${span} · ${formatNumber(records.length)} snapshots`;
 
   const start = meta ? toTimestamp(meta.start) : NaN;
   const end = meta ? toTimestamp(meta.end) : NaN;
@@ -1051,38 +1042,17 @@ function renderSeasonRun() {
   $("#runTrack").setAttribute("aria-valuenow", String(percent));
 }
 
-function renderHeadings() {
-  const focused = state.focused;
-  const measure = state.metric === "score" ? "Rank score" : "Leaderboard rank";
+// On a narrow chart the season bar moves from the filter row to just under
+// the plot, so the chart itself is the first thing on a phone screen.
+function placeSeasonRun(below) {
+  const run = $("#seasonRun");
+  const home = below ? $(".chart-card") : $(".controls");
+  if (run.parentElement !== home) home.append(run);
+  run.classList.toggle("is-below", below);
+}
 
-  $("#chartEyebrow").textContent = focused
-    ? "All seasons overlaid"
-    : `Season ${state.season}`;
-  $("#chartTitle").textContent = focused || "Ranked cashout";
-
-  // A colour bar on the eyebrow ties the header to the highlighted line.
-  document.documentElement.style.setProperty(
-    "--eyebrow-accent",
-    focused ? colorFor(focused) : cssValue("--accent"),
-  );
-
-  const chips = [measure];
-  if (focused) {
-    const seasons = state.seasonList.filter(
-      (season) => playerRecords(focused, season).length,
-    ).length;
-    chips.push(`${seasons} seasons`, `${state.season} highlighted`);
-  }
-  $("#chartMeta").replaceChildren(
-    ...chips.map((text, index) => {
-      const chip = document.createElement("span");
-      chip.className = index === 0 ? "meta-chip is-lead" : "meta-chip";
-      chip.textContent = text;
-      return chip;
-    }),
-  );
-
-  $("#clearFocus").hidden = !focused;
+function renderChartHead() {
+  $("#clearFocus").hidden = !state.focused;
 }
 
 function renderLegend() {
@@ -1127,16 +1097,29 @@ function renderLegend() {
       const name = document.createElement("span");
       name.style.color = "var(--text-primary)";
       name.textContent = player;
-      button.append(key, name);
+      button.append(key, name, legendValue(player));
       button.onclick = () => setFocus(player);
       return button;
     }),
   );
 }
 
+// The same latest figure the wide chart prints at each line's end - on a
+// phone those end tags are dropped.
+function legendValue(player) {
+  const latest = playerRecords(player).at(-1);
+  const value = document.createElement("span");
+  value.className = "legend-value";
+  value.textContent =
+    state.metric === "rank"
+      ? formatRank(latest?.rank)
+      : formatNumber(latest?.score);
+  return value;
+}
+
 function setFocus(player) {
   state.focused = state.focused === player ? "" : player;
-  renderHeadings();
+  renderChartHead();
   renderLegend();
   renderChart();
   renderLivePanel();
@@ -1376,7 +1359,8 @@ document.querySelectorAll(".metric-button").forEach((button) => {
       item.classList.toggle("is-active", active);
       item.setAttribute("aria-pressed", String(active));
     });
-    renderHeadings();
+    renderChartHead();
+    renderLegend();
     renderChart();
   };
 });
