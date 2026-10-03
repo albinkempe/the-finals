@@ -269,35 +269,6 @@ h3 {
   gap: 10px;
 }
 
-.data-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--delta-up);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--delta-up) 22%, transparent);
-}
-
-.status-dot.is-error {
-  background: var(--delta-down);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--delta-down) 22%, transparent);
-}
-
 .theme-toggle {
   display: inline-grid;
   place-items: center;
@@ -449,6 +420,11 @@ h3 {
   gap: 6px;
 }
 
+.season-run.is-below {
+  max-width: none;
+  margin: 14px 0 4px;
+}
+
 .run-head {
   display: flex;
   align-items: baseline;
@@ -493,12 +469,6 @@ h3 {
   );
 }
 
-.run-note {
-  margin: 0;
-  font-size: 11.5px;
-  color: var(--text-muted);
-}
-
 /* --- chart ----------------------------------------------------------------- */
 .chart-card {
   padding: 22px 26px 18px;
@@ -524,63 +494,6 @@ h3 {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.chart-title-block {
-  min-width: 0;
-}
-
-.chart-eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 7px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.chart-eyebrow::before {
-  content: "";
-  width: 16px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--eyebrow-accent, var(--accent));
-}
-
-.chart-head h1 {
-  font-stretch: 112%;
-  font-weight: 800;
-  text-transform: uppercase;
-  font-size: 27px;
-  letter-spacing: 0.002em;
-  line-height: 1.05;
-}
-
-.chart-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 11px;
-}
-
-.meta-chip {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.meta-chip.is-lead {
-  border-color: transparent;
-  background: var(--surface-3);
-  color: var(--text-primary);
-  font-weight: 600;
 }
 
 .chart-back {
@@ -647,6 +560,23 @@ h3 {
 .legend-button:hover {
   background: var(--surface-2);
   border-color: var(--border);
+}
+
+/* Set exactly like the figure on the wide chart's end tags: muted mono at
+   10.5px, sitting 6px after the name. Shown only while those end tags are
+   dropped, i.e. when the chart is too narrow for them. */
+.legend-value {
+  display: none;
+  margin-left: -2px;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.chart-legend.shows-values .legend-value {
+  display: inline;
 }
 
 .legend-key {
@@ -1355,10 +1285,6 @@ h3 {
 
   .chart-card {
     padding: 18px 14px 12px;
-  }
-
-  .chart-head h1 {
-    font-size: 22px;
   }
 
   .chart-wrap {
