@@ -374,14 +374,12 @@ function playerModel(player) {
       const records = playerRecords(player, season)
         .filter(hasMetric)
         .sort((a, b) => a.timestamp - b.timestamp);
-      // Day 1 is the season's own opening day, not the day tracking happened to
-      // start. S9 was only picked up three weeks in, so anchoring on its first
-      // snapshot would draw those weeks as if they were the opening of the run
-      // and leave the season ending three weeks before every other one. Against
-      // the published start the run sits where it really fell: beginning late,
-      // finishing level with the others. Seasons with no published start fall
-      // back to their first snapshot.
-      const opened = state.seasons[season]?.start || records[0].date;
+      // The daily fetch is recorded the morning after the rank day it returns.
+      // Align snapshots to that effective day so a season's first result lands
+      // on Day 1. Published starts also keep late-tracked seasons in place;
+      // seasons without metadata fall back to their first snapshot.
+      const publishedStart = state.seasons[season]?.start;
+      const opened = publishedStart || records[0].date;
       const primary = season === state.season;
       return {
         id: season,
@@ -390,7 +388,10 @@ function playerModel(player) {
         primary,
         points: withPrevious(
           records.map((record) => {
-            const day = daysBetween(opened, record.date);
+            const day = Math.max(
+              0,
+              daysBetween(opened, record.date) - (publishedStart ? 1 : 0),
+            );
             return {
               key: String(day),
               x: day,
@@ -1029,10 +1030,16 @@ function renderSeasonRun() {
     return;
   }
 
-  const total = Math.max(1, Math.round((end - start) / DAY_MS));
+  const total = Math.max(1, daysBetween(meta.start, meta.end));
+  const today = new Date();
+  const todayDate = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
   const elapsed = Math.min(
     total,
-    Math.max(0, Math.round((Date.now() - start) / DAY_MS)),
+    Math.max(0, daysBetween(meta.start, todayDate) - 1),
   );
   const percent = Math.round((elapsed / total) * 100);
   $("#runDay").textContent =
